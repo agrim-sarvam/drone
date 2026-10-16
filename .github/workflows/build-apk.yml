@@ -42,11 +42,10 @@ jobs:
 
       - name: Locate APK
         run: |
-          echo "### 📦 Found APK Files:" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          find android-dji-bridge/app/build -name "*.apk" | tee -a $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cp android-dji-bridge/app/build/outputs/apk/debug/*.apk ./Sentinel-DJI-Bridge.apk
+          APK_FILE=$(find android-dji-bridge/app/build -name "*.apk" | head -n 1)
+          echo "Found APK: $APK_FILE"
+          echo "### 📦 Built APK: \`$APK_FILE\`" >> $GITHUB_STEP_SUMMARY
+          cp "$APK_FILE" ./Sentinel-DJI-Bridge.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
