@@ -84,16 +84,13 @@ DJI drones (Mini, Mavic, Air, Phantom, Inspire, Matrice series compatible with D
 ```
 
 ### Step 1: Install the Android Bridge App
-1. Open the project folder `android-dji-bridge/` in **Android Studio**.
-2. If you have a custom DJI Developer API Key, ensure it is set in `local.properties`:
-   ```properties
-   dji.api.key=YOUR_DJI_DEVELOPER_KEY
-   ```
-3. Connect your Android phone via USB and run the app, or build the APK via Gradle:
-   ```bash
-   ./gradlew assembleDebug
-   ```
-   Install `app/build/outputs/apk/debug/app-debug.apk` onto the Android device.
+1. **Direct Download (Recommended):**
+   Download the compiled APK directly onto your Android phone:
+   👉 **[Download Sentinel-DJI-Bridge.apk](https://github.com/vijayKota2776/drone/releases/download/v1.0.0-apk/Sentinel-DJI-Bridge.apk)**
+   *(Open this link on your Android phone, tap Download, and tap Install).*
+
+2. **Or Build from Source:**
+   Open `android-dji-bridge/` in Android Studio or build with `./gradlew assembleDebug`.
 
 ### Step 2: Establish the Hardware Link
 1. Connect your Android phone to the **DJI Remote Controller** via USB cable.
