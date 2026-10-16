@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -43,9 +46,20 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           find android-dji-bridge/app/build -name "*.apk" | tee -a $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          cp android-dji-bridge/app/build/outputs/apk/debug/*.apk ./Sentinel-DJI-Bridge.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Sentinel-DJI-Bridge-APK
-          path: android-dji-bridge/app/build/outputs/apk/
+          path: ./Sentinel-DJI-Bridge.apk
+
+      - name: Publish Public GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0-apk
+          name: "Sentinel DJI Bridge APK (v1.0.0)"
+          body: "Direct download APK for Android phone connected to DJI Remote Controller (Air 2S / Mini / Mavic)."
+          files: ./Sentinel-DJI-Bridge.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
