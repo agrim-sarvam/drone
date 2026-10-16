@@ -10,7 +10,7 @@ public class TelemetryManager {
     
     private final TelemetryUdpExporter exporter;
     private int currentBattery = -1;
-    private Float referenceAltitude = null;
+    private Double referenceAltitude = null;
     
     public TelemetryManager(TelemetryUdpExporter exporter) {
         this.exporter = exporter;
@@ -75,7 +75,7 @@ public class TelemetryManager {
         data.battery = currentBattery;
         
         // Log periodically
-        if (exporter.packetsSent % 10 == 0) {
+        if (exporter.packetsSent.get() % 10 == 0) {
             Log.i(TAG, "[TELEMETRY] lat=" + data.lat + " lon=" + data.lon + " alt=" + data.altitude_m + " heading=" + data.heading_deg);
         }
         

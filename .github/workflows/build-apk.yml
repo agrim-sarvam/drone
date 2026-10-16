@@ -18,14 +18,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Make Gradle executable
-        run: chmod +x android-dji-bridge/gradlew
-
-      - name: Build Debug APK
+      - name: Configure Android SDK and build APK
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m"
-          SKIP_JDK_VERSION_CHECK: "true"
         run: |
+          echo "sdk.dir=$ANDROID_HOME" > android-dji-bridge/local.properties
+          chmod +x android-dji-bridge/gradlew
           cd android-dji-bridge
           ./gradlew assembleDebug --no-daemon --stacktrace
 
