@@ -39,11 +39,13 @@ jobs:
 
       - name: Locate APK
         run: |
-          find android-dji-bridge/app/build -name "*.apk"
+          echo "### 📦 Found APK Files:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          find android-dji-bridge/app/build -name "*.apk" | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Sentinel-DJI-Bridge-APK
-          path: android-dji-bridge/app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
+          path: android-dji-bridge/app/build/outputs/apk/
