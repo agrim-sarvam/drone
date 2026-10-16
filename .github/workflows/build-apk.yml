@@ -40,6 +40,13 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           tail -n 120 build.log >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git checkout -b build-logs || git checkout build-logs
+          cp build.log build_error.txt
+          git add build_error.txt
+          git commit -m "chore: save build log" || true
+          git push origin build-logs -f || true
 
       - name: Locate APK
         run: |
