@@ -32,7 +32,9 @@ You need: the **DJI-enabled** APK (not the network-test one), the laptop running
 
 7. Fully close DJI Fly. Power on Air 2S and RC-N1, plug the phone into the RC. When Android asks which app opens the DJI accessory, choose **Sentinel DJI Bridge**. Wait for **Aircraft: CONNECTED** and an updating **Sample age**. The camera picture appears at the top of the bridge app and the line under it says **Camera: LIVE** (usually within a few seconds).
 8. Press **START UDP**. The phone shows **Route: Wi-Fi …** (or *system default* on phone hotspot) and **Packets sent** increasing with **Send errors: 0**.
-9. Laptop shows **RECEIVING, WAITING FOR GPS FIX** indoors; outdoors with GPS it shows **RECEIVED** and the drone marker on the map. Compare battery and position with the drone.
+9. Indoors the phone shows **Held until GPS fix** counting up and the laptop keeps waiting: positions are only sent once the drone has GPS. Outdoors with GPS the laptop shows **RECEIVED** and the drone marker on the map. Compare battery and position with the drone.
+
+The phone sends the original telemetry format (schema 1), so the laptop app the tester already has works unchanged; the updated laptop app also accepts it.
 10. Press **SAVE DIAGNOSTIC REPORT** on the phone and **Save receiver report** on the laptop, and send both files back whether it worked or not.
 
 Important: while the bridge owns the RC's USB connection, **DJI Fly cannot use it**. The bridge app shows the live camera on the phone instead (video is not sent to the laptop). It is a plain view without DJI Fly's flight overlays and warnings, so fly only with visual line of sight and normal safety procedures.
@@ -50,13 +52,13 @@ Important: while the bridge owns the RC's USB connection, **DJI Fly cannot use i
 
 ## 1. Owner: obtain the two matching applications
 
-1. Review and merge the bridge repair branch (both Android and desktop changes are required for schema V2).
+1. Review and merge the bridge repair branch (the phone sends schema 1, so an existing laptop install keeps working).
 2. In DJI Developer, register an Android Mobile SDK application for package **`com.sentinel.cop.dji`**. Obtain that application's API key. This requires the owner's account; the repository cannot manufacture a valid key.
 3. In the GitHub repository, open **Settings → Secrets and variables → Actions → New repository secret**. Name it **`DJI_API_KEY`** and paste the key as its value. Do not put it in an issue, commit, workflow input, screenshot or chat. The key necessarily exists in the built APK; it is not an authentication credential for the laptop UDP receiver.
 4. Open **Actions → Bridge checks and APK → Run workflow**. Choose the repair branch (or main after merging), enable **Build DJI-enabled APK**, and run it.
 5. Wait for green desktop, Android network-test and DJI APK jobs. Download **`dji-enabled-apk-and-reports`** from that run's Artifacts. Extract `app-debug.apk` and its checksum. This is an installable developer/test APK, not a production-signed store release.
 6. Do **not** give the friend the **network-test** APK as a DJI bridge. Its different package ends in `.networktest`, its version says network-test, and DJI registration is deliberately disabled. That APK is useful to test local Wi-Fi and the map without a DJI key or drone.
-7. Download the matching **Windows desktop** artifact from **Windows desktop package** in Actions (or build locally as below). Extract the whole portable application folder; do not copy only the executable. Old desktop builds reject schema V2.
+7. Download the matching **Windows desktop** artifact from **Windows desktop package** in Actions (or build locally as below). Extract the whole portable application folder; do not copy only the executable. The original desktop build also accepts the phone's packets; the updated one adds the IP hint and clearer states.
 8. Keep the commit/run URL and checksums with the delivered files. Use the same run/commit for both apps. These CI APKs use development signing. A fresh runner can use a different debug certificate; if Android reports an incompatible update, save diagnostics and uninstall the old test app before installing. For maintained production distribution, the owner must configure a stable signing key and validate the real hardware matrix first.
 
 Public repositories permit reading, not pushing. A contributor without write access works in a fork and sends the owner a pull request. Secrets do not transfer to a fork. The owner can run the workflow in their repository after merging.

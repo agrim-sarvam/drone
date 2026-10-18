@@ -77,6 +77,10 @@
         android:id="@+id/export_button"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:text="SAVE DIAGNOSTIC REPORT" />
+    <Button
+        android:id="@+id/share_button"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="SHARE DIAGNOSTIC REPORT (WhatsApp / email)" />
     <TextView
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:text="Telemetry only. Stop UDP before editing destination. Test packets are synthetic. Reports remain local until you share them." />

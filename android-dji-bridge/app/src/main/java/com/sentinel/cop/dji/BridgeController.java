@@ -27,6 +27,9 @@ public final class BridgeController {
     public volatile String sdk = BuildConfig.NETWORK_ONLY ? "NETWORK TEST ONLY (DJI disabled)" : "NOT REGISTERED";
     public volatile String aircraft = "DISCONNECTED";
     public volatile String udp = "STOPPED";
+    public volatile String missingPermissions = "";
+    /** Model and firmware: firmware newer than DJI tested with the SDK is a likely field failure. */
+    public volatile String product = "none";
     public volatile TelemetryData latest;
     private volatile boolean registering;
     private boolean pendingUsbAttach;
@@ -126,6 +129,7 @@ public final class BridgeController {
     private void attachCurrentProduct() {
         main.removeCallbacks(retryAttach);
         BaseProduct product = DJISDKManager.getInstance().getProduct();
+        describe(product);
         if (!(product instanceof Aircraft) || !product.isConnected()) {
             detach(); latest = null; manager.reset(); aircraft = "DISCONNECTED"; notifyObservers(); return;
         }
@@ -168,6 +172,11 @@ public final class BridgeController {
         if (flight == null || battery == null) main.postDelayed(retryAttach, 1000);
         notifyObservers();
     }
+    private void describe(BaseProduct current) {
+        String text = current == null ? "none" : (current.getModel() == null ? "unknown model" : current.getModel().getDisplayName())
+                + ", firmware " + current.getFirmwarePackageVersion() + (current.isConnected() ? "" : " (aircraft not linked)");
+        if (!text.equals(product)) { product = text; Diagnostics.record("Product: " + text); }
+    }
     /** Single path from an SDK-independent snapshot to the wire; instrumentation tests drive it without DJI hardware. */
     void publish(FlightSnapshot snapshot) {
         TelemetryData sample = manager.updateFlightState(snapshot);
@@ -191,8 +200,12 @@ public final class BridgeController {
         Diagnostics.record("UDP stopped"); notifyObservers();
     }
     public String diagnosticReport() {
-        return Diagnostics.report("SDK: " + sdk + "\nAircraft: " + aircraft + "\nUDP: " + udp + "\nRoute: " + exporter.route()
-                + "\nPackets sent: " + exporter.packetsSent.get() + "\nSend errors: " + exporter.sendErrors.get()
+        String sdkVersion = "n/a";
+        if (!BuildConfig.NETWORK_ONLY) { try { sdkVersion = DJISDKManager.getInstance().getSDKVersion(); } catch (Throwable ignored) { } }
+        return Diagnostics.report("SDK: " + sdk + "\nDJI SDK version: " + sdkVersion
+                + "\nPermissions missing: " + (missingPermissions.isEmpty() ? "none" : missingPermissions)
+                + "\nProduct: " + product + "\nAircraft: " + aircraft + "\nUDP: " + udp + "\nRoute: " + exporter.route()
+                + "\nPackets sent: " + exporter.packetsSent.get() + "\nSend errors: " + exporter.sendErrors.get() + "\nHeld until GPS fix: " + exporter.waitingForFix.get()
                 + "\nSample age ms: " + (latest == null ? "none" : Math.max(0, System.currentTimeMillis() - latest.timestamp)));
     }
 }

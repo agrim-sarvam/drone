@@ -33,8 +33,9 @@ public class TelemetryManagerTest {
         assertFalse(TelemetryManager.validPosition(Double.NaN,77,12));
         assertFalse(TelemetryManager.validPosition(91,77,12));
     }
+    /** tests/fixtures/dji-v1-bridge.json is also fed to the original and updated laptop receivers in Node tests. */
     @Test public void encoderMatchesSharedDesktopContract() throws Exception {
-        try(java.io.InputStream in=getClass().getResourceAsStream("/dji-v2.json")) {
+        try(java.io.InputStream in=getClass().getResourceAsStream("/dji-v1-bridge.json")) {
             assertNotNull(in);
             JSONObject fixture=new JSONObject(new String(in.readAllBytes(),StandardCharsets.UTF_8));
             TelemetryData sample=new TelemetryData();
@@ -42,7 +43,7 @@ public class TelemetryManagerTest {
             sample.position_valid=true; sample.lat=fixture.getDouble("latitude"); sample.lon=fixture.getDouble("longitude");
             sample.relative_altitude_m=40; sample.heading_deg=270; sample.yaw_deg=-90; sample.gps_satellites=12;
             sample.flying=true; sample.flight_state="GPS_NORMAL"; sample.battery=80;
-            JSONObject actual=new JSONObject(new String(TelemetryUdpExporter.encode(sample,"contract-fixture",1,false),StandardCharsets.UTF_8));
+            JSONObject actual=new JSONObject(new String(TelemetryUdpExporter.encode(sample,false),StandardCharsets.UTF_8));
             java.util.Iterator<String> keys=fixture.keys();
             while(keys.hasNext()) {
                 String key=keys.next(); Object expected=fixture.get(key), value=actual.get(key);

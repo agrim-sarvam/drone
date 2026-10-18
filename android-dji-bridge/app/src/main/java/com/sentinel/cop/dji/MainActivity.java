@@ -57,6 +57,11 @@ public class MainActivity extends Activity {
                     .setType("text/plain").putExtra(Intent.EXTRA_TITLE, "sentinel-diagnostics.txt");
             startActivityForResult(intent, EXPORT);
         });
+        // Testers are remote: hand the report straight to WhatsApp/email instead of a file they must find again.
+        findViewById(R.id.share_button).setOnClickListener(v -> startActivity(Intent.createChooser(
+                new Intent(Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(Intent.EXTRA_SUBJECT, "Sentinel DJI Bridge diagnostic report")
+                        .putExtra(Intent.EXTRA_TEXT, controller.diagnosticReport()), "Share diagnostic report")));
         if (!BuildConfig.NETWORK_ONLY) requestSdkPermissions();
         handleUsbIntent(getIntent());
     }
@@ -101,14 +106,17 @@ public class MainActivity extends Activity {
     }
     private void message(String text) { Toast.makeText(this, text, Toast.LENGTH_LONG).show(); }
     private void render() {
-        sdkText.setText("DJI SDK: " + controller.sdk);
-        aircraftText.setText("Aircraft: " + controller.aircraft);
+        sdkText.setText("DJI SDK: " + controller.sdk + (controller.missingPermissions.isEmpty() ? ""
+                : "\nNot granted: " + controller.missingPermissions + " (Settings > Apps > Sentinel DJI Bridge > Permissions, then Retry)"));
+        aircraftText.setText("Aircraft: " + controller.aircraft
+                + (controller.product.equals("none") ? "" : "\n" + controller.product));
         video.update(controller.aircraft.startsWith("CONNECTED"));
         boolean running = controller.exporter.isRunning();
         udpText.setText("UDP: " + controller.udp + "\nEffective destination: " + controller.exporter.effectiveDestination()
                 + "\nRoute: " + controller.exporter.route()
                 + "\nPackets sent: " + controller.exporter.packetsSent.get() + " (not acknowledged)"
-                + "\nSend errors: " + controller.exporter.sendErrors.get());
+                + "\nSend errors: " + controller.exporter.sendErrors.get()
+                + "\nHeld until GPS fix: " + controller.exporter.waitingForFix.get());
         startButton.setText(running ? "STOP UDP" : "START UDP");
         // Some OEM battery policies throttle background networking even with a foreground service.
         if (running) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -136,19 +144,25 @@ public class MainActivity extends Activity {
         if (BuildConfig.NETWORK_ONLY) { message("DJI disabled in network-test build."); return; }
         ArrayList<String> missing = new ArrayList<>();
         for (String p : requiredPermissions()) if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) missing.add(p);
-        if (missing.isEmpty()) controller.register();
+        if (missing.isEmpty()) { controller.missingPermissions = ""; controller.register(); }
         else requestPermissions(missing.toArray(new String[0]), PERMISSIONS);
     }
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (code != PERMISSIONS) return;
-        for (String p : requiredPermissions()) {
-            if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) {
-                controller.sdk = "PERMISSION REQUIRED (use Retry after granting in Settings)";
-                Diagnostics.record("SDK permissions denied"); render(); return;
-            }
-        }
+        // Register regardless: DJI treats the phone permission as optional, and Android 12+ makes "Approximate"
+        // location an easy tap. Blocking here left testers stuck; DJI's own result says what is really needed.
+        ArrayList<String> missing = new ArrayList<>();
+        for (String p : requiredPermissions()) if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) missing.add(label(p));
+        controller.missingPermissions = missing.isEmpty() ? "" : String.join(", ", missing);
+        if (!missing.isEmpty()) Diagnostics.record("Permissions not granted: " + controller.missingPermissions);
         controller.register();
+    }
+    private static String label(String permission) {
+        if (Manifest.permission.ACCESS_FINE_LOCATION.equals(permission)) return "Precise location";
+        if (Manifest.permission.ACCESS_COARSE_LOCATION.equals(permission)) return "Location";
+        if (Manifest.permission.READ_PHONE_STATE.equals(permission)) return "Phone";
+        return "Storage";
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);

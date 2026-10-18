@@ -36,7 +36,7 @@ public class TelemetryUdpExporterTest {
     }
     @Test public void senderStopsAndRestartsWithNewDestination() throws Exception {
         TelemetryUdpExporter exporter = new TelemetryUdpExporter();
-        TelemetryData sample = new TelemetryData(); sample.drone_id="TEST"; sample.timestamp=1;
+        TelemetryData sample = withFix();
         try (DatagramSocket first=new DatagramSocket(0); DatagramSocket second=new DatagramSocket(0)) {
             first.setSoTimeout(2000); second.setSoTimeout(2000);
             exporter.start(Destination.parse("127.0.0.1",String.valueOf(first.getLocalPort())));
@@ -62,7 +62,7 @@ public class TelemetryUdpExporterTest {
     @Test public void failedNetworkBindStillSendsOnDefaultRoute() throws Exception {
         TelemetryUdpExporter exporter = new TelemetryUdpExporter();
         exporter.setRoute((socket, destination) -> { throw new java.net.SocketException("ENONET"); });
-        TelemetryData sample = new TelemetryData(); sample.drone_id="TEST"; sample.timestamp=1;
+        TelemetryData sample = withFix();
         try (DatagramSocket receiver=new DatagramSocket(0)) {
             receiver.setSoTimeout(2000);
             exporter.start(Destination.parse("127.0.0.1",String.valueOf(receiver.getLocalPort())));
@@ -73,7 +73,7 @@ public class TelemetryUdpExporterTest {
     }
     @Test public void tenHertzAircraftSamplesAreNotThinned() throws Exception {
         TelemetryUdpExporter exporter = new TelemetryUdpExporter();
-        TelemetryData sample = new TelemetryData(); sample.drone_id="TEST"; sample.timestamp=1;
+        TelemetryData sample = withFix();
         try (DatagramSocket receiver=new DatagramSocket(0)) {
             receiver.setSoTimeout(2000);
             exporter.start(Destination.parse("127.0.0.1",String.valueOf(receiver.getLocalPort())));
@@ -84,12 +84,31 @@ public class TelemetryUdpExporterTest {
             assertEquals(10, exporter.packetsSent.get());
         } finally { exporter.stop(); }
     }
-    @Test public void encodingHasExplicitNoFixAndNoInventedMsl() throws Exception {
-        TelemetryData sample=new TelemetryData(); sample.drone_id="DJI_AIRCRAFT"; sample.relative_altitude_m=40; sample.battery=80;
-        JSONObject data=new JSONObject(new String(TelemetryUdpExporter.encode(sample,"test-session",1,false),StandardCharsets.UTF_8));
-        assertFalse(data.getBoolean("position_valid"));
-        assertTrue(data.isNull("latitude")); assertTrue(data.isNull("longitude")); assertTrue(data.isNull("altitude_m"));
-        assertEquals(40,data.getDouble("relative_altitude_m"),0);
-        assertEquals(80,data.getInt("battery_percent"));
+    private static TelemetryData withFix() {
+        TelemetryData sample = withFix();
+        sample.position_valid=true; sample.lat=28.6; sample.lon=77.2; sample.gps_satellites=12;
+        return sample;
+    }
+    @Test public void samplesWithoutGpsFixAreHeldNotSent() throws Exception {
+        TelemetryUdpExporter exporter = new TelemetryUdpExporter();
+        TelemetryData noFix = new TelemetryData(); noFix.drone_id="TEST"; noFix.timestamp=1;
+        try (DatagramSocket receiver=new DatagramSocket(0)) {
+            receiver.setSoTimeout(300);
+            exporter.start(Destination.parse("127.0.0.1",String.valueOf(receiver.getLocalPort())));
+            exporter.sendTelemetry(noFix);
+            try { receiver.receive(new DatagramPacket(new byte[4096],4096)); fail("no-fix sample was sent"); }
+            catch (java.net.SocketTimeoutException expected) { }
+            assertEquals(1, exporter.waitingForFix.get());
+            assertEquals(0, exporter.packetsSent.get());
+        } finally { exporter.stop(); }
+    }
+    @Test public void originalLaptopDisplayFieldsAreAlwaysNumbers() throws Exception {
+        // The original laptop UI calls toFixed() on these; a null would crash its screen.
+        TelemetryData sample = withFix(); sample.relative_altitude_m=Double.NaN; sample.yaw_deg=Double.NaN; sample.speed_mps=Double.NaN;
+        JSONObject data=new JSONObject(new String(TelemetryUdpExporter.encode(sample,false),StandardCharsets.UTF_8));
+        assertEquals(1,data.getInt("schema_version"));
+        for (String key : new String[]{"latitude","longitude","altitude_m","yaw_deg","speed_mps"})
+            assertTrue(key, data.get(key) instanceof Number);
+        assertTrue(data.isNull("relative_altitude_m"));
     }
 }

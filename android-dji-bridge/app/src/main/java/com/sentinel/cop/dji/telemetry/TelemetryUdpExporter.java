@@ -6,7 +6,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -25,12 +24,12 @@ public class TelemetryUdpExporter {
     private volatile boolean running;
     private long lastSendNanos;
     private long lastRebindNanos;
-    private long sequence;
-    private String session;
     private volatile Route route = (socket, destination) -> "system default";
     private volatile String routeDescription = "Not started";
     public final AtomicLong packetsSent = new AtomicLong();
     public final AtomicLong sendErrors = new AtomicLong();
+    /** Aircraft samples held back because the aircraft had no GPS fix yet. */
+    public final AtomicLong waitingForFix = new AtomicLong();
     private Result observer = (success, detail) -> { };
 
     public synchronized void setObserver(Result observer) { this.observer = observer; }
@@ -41,12 +40,11 @@ public class TelemetryUdpExporter {
         stop();
         this.destination = destination;
         socket = open(destination);
-        session = UUID.randomUUID().toString();
-        sequence = 0;
         lastSendNanos = 0;
         lastRebindNanos = System.nanoTime();
         packetsSent.set(0);
         sendErrors.set(0);
+        waitingForFix.set(0);
         worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(1), new ThreadPoolExecutor.DiscardOldestPolicy());
         running = true;
@@ -79,14 +77,15 @@ public class TelemetryUdpExporter {
         long now = System.nanoTime();
         if (lastSendNanos != 0 && now - lastSendNanos < MIN_SEND_INTERVAL_NANOS) return;
         lastSendNanos = now;
+        // The original laptop receiver has no "no fix" state: a position-less packet would plot at 0,0 or
+        // crash its display. Hold samples until the aircraft has GPS; the phone screen shows the wait.
+        if (!data.position_valid) { waitingForFix.incrementAndGet(); return; }
         final DatagramSocket activeSocket = socket;
         final Destination target = destination;
         final Result callback = observer;
-        final String activeSession = session;
-        final long next = sequence++;
         worker.execute(() -> {
             try {
-                byte[] payload = encode(data, activeSession, next, false);
+                byte[] payload = encode(data, false);
                 activeSocket.send(new DatagramPacket(payload, payload.length, InetAddress.getByName(target.host), target.port));
                 synchronized (TelemetryUdpExporter.this) {
                     if (activeSocket != socket) return;
@@ -128,9 +127,10 @@ public class TelemetryUdpExporter {
                 data.lat = 28.6139;
                 data.lon = 77.2090;
                 data.position_valid = true;
+                data.gps_satellites = 12;
                 data.relative_altitude_m = 0;
                 data.battery = -1;
-                byte[] payload = encode(data, UUID.randomUUID().toString(), 0, true);
+                byte[] payload = encode(data, true);
                 testSocket.send(new DatagramPacket(payload, payload.length, InetAddress.getByName(target.host), target.port));
                 callback.complete(true, "TEST sent via " + via + "; confirm SYNTHETIC_NETWORK_TEST on laptop");
             } catch (Exception e) {
@@ -138,26 +138,27 @@ public class TelemetryUdpExporter {
             }
         }, "bridge-network-test").start();
     }
-    static byte[] encode(TelemetryData d, String session, long sequence, boolean test) throws Exception {
+    /**
+     * Schema version 1: the format the original Sentinel laptop app accepts (and the updated one still does),
+     * so testers need no laptop update. Callers send only samples with a GPS fix. The original UI calls
+     * toFixed() on latitude, longitude, altitude_m, yaw_deg and speed_mps, so those are always numbers.
+     */
+    static byte[] encode(TelemetryData d, boolean test) throws Exception {
         JSONObject json = new JSONObject();
-        json.put("schema_version", 2);
+        json.put("schema_version", 1);
         json.put("drone_id", d.drone_id);
         json.put("timestamp", d.timestamp);
-        json.put("session_id", session);
-        json.put("sequence", sequence);
         json.put("synthetic", test);
-        json.put("position_valid", d.position_valid);
-        json.put("latitude", d.position_valid ? d.lat : JSONObject.NULL);
-        json.put("longitude", d.position_valid ? d.lon : JSONObject.NULL);
-        // DJI V4 aircraft altitude is relative to takeoff, not MSL.
-        json.put("altitude_m", JSONObject.NULL);
-        json.put("altitude_reference", "takeoff");
+        json.put("latitude", d.lat);
+        json.put("longitude", d.lon);
+        // DJI V4 reports only barometric height above takeoff; V1 has no MSL source, and its "Alt" shows this.
+        json.put("altitude_m", finiteOrZero(d.relative_altitude_m));
         putFinite(json, "relative_altitude_m", d.relative_altitude_m);
         putFinite(json, "heading_deg", d.heading_deg);
-        putFinite(json, "yaw_deg", d.yaw_deg);
+        json.put("yaw_deg", finiteOrZero(d.yaw_deg));
         putFinite(json, "pitch_deg", d.pitch_deg);
         putFinite(json, "roll_deg", d.roll_deg);
-        putFinite(json, "speed_mps", d.speed_mps);
+        json.put("speed_mps", finiteOrZero(d.speed_mps));
         putFinite(json, "velocity_x_mps", d.velocity_x_mps);
         putFinite(json, "velocity_y_mps", d.velocity_y_mps);
         putFinite(json, "velocity_z_mps", d.velocity_z_mps);
@@ -167,6 +168,7 @@ public class TelemetryUdpExporter {
         json.put("battery_percent", d.battery < 0 ? JSONObject.NULL : d.battery);
         return json.toString().getBytes(StandardCharsets.UTF_8);
     }
+    private static double finiteOrZero(double value) { return Double.isFinite(value) ? value : 0; }
     private static void putFinite(JSONObject json, String key, double value) throws Exception {
         json.put(key, Double.isFinite(value) ? value : JSONObject.NULL);
     }

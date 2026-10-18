@@ -61,6 +61,29 @@ test('UDP fixture, sequence rejection, session restart, timeout and recovery', a
     assert.equal(adapter.status,'TELEMETRY_RECEIVED');
 });
 
+test('phone bridge V1 packet is accepted by the updated receiver with an honest altitude label', () => {
+    const data = normalizePacket(require('../fixtures/dji-v1-bridge.json'));
+    assert.equal(data.position.valid,true);
+    assert.equal(data.position.altitudeReference,'legacy-unspecified');
+    assert.equal(data.position.relativeAltitude,40);
+    assert.equal(data.status.synthetic,false);
+    assert.equal(normalizePacket({...require('../fixtures/dji-v1-bridge.json'),synthetic:true}).status.synthetic,true);
+});
+
+test('phone bridge V1 packet reaches the original laptop receiver and its screen can render it', async t => {
+    const original = require('../legacy/OriginalDJIAdapter.cjs');
+    const renderOriginalUi = require('../legacy/originalUi.cjs');
+    const sender = dgram.createSocket('udp4');
+    t.after(()=>{ sender.close(); original.disconnect(); });
+    await original.connect({host:'127.0.0.1',port:0,timeout:1000});
+    const port = original.udpSocket.address().port;
+    const event = once(original,'telemetry',{signal:AbortSignal.timeout(2000)});
+    sender.send(Buffer.from(JSON.stringify(require('../fixtures/dji-v1-bridge.json'))),port,'127.0.0.1');
+    const [data] = await event;
+    assert.equal(original.status,'TELEMETRY_RECEIVED');
+    assert.deepEqual(renderOriginalUi(data),['28.613900','77.209000','40.0','-90.0','0.0']);
+});
+
 test('listener with no packets yet stays waiting instead of reporting lost telemetry', async t => {
     const {adapter} = await receiver(t,100);
     await delay(250);

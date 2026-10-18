@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "drone_id": "DJI_AIRCRAFT",
+  "timestamp": 1792300000000,
+  "synthetic": false,
+  "latitude": 28.6139,
+  "longitude": 77.209,
+  "altitude_m": 40,
+  "relative_altitude_m": 40,
+  "heading_deg": 270,
+  "yaw_deg": -90,
+  "pitch_deg": 0,
+  "roll_deg": 0,
+  "speed_mps": 0,
+  "velocity_x_mps": 0,
+  "velocity_y_mps": 0,
+  "velocity_z_mps": 0,
+  "gps_satellites": 12,
+  "flying": true,
+  "flight_state": "GPS_NORMAL",
+  "battery_percent": 80
+}

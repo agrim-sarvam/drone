@@ -88,8 +88,10 @@ public class BridgeActivityTest {
                 SystemClock.sleep(100);
             }
             long until = SystemClock.uptimeMillis() + 2000;
-            while (controller().exporter.packetsSent.get() < 40 && SystemClock.uptimeMillis() < until) SystemClock.sleep(50);
-            assertEquals(40, controller().exporter.packetsSent.get());
+            while (controller().exporter.packetsSent.get() < 30 && SystemClock.uptimeMillis() < until) SystemClock.sleep(50);
+            // No-fix samples are held on the phone: the original laptop app cannot represent them.
+            assertEquals(30, controller().exporter.packetsSent.get());
+            assertEquals(10, controller().exporter.waitingForFix.get());
             assertEquals(0, controller().exporter.sendErrors.get());
         } finally {
             InstrumentationRegistry.getInstrumentation().getTargetContext().stopService(new android.content.Intent(

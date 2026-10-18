@@ -13,3 +13,6 @@ android-dji-bridge/**/build/
 *.jks
 *.keystore
 test-results/
+
+# Shared test-build signing key (public debug credentials) so updates install over earlier test APKs.
+!android-dji-bridge/app/sentinel-debug.keystore

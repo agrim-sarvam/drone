@@ -35,10 +35,10 @@ final class LiveVideo implements TextureView.SurfaceTextureListener {
 
     /** Called from the Activity's render loop on the main thread. */
     void update(boolean aircraftConnected) {
-        if (BuildConfig.NETWORK_ONLY) { status.setText("Camera: disabled in network-test build"); return; }
+        if (BuildConfig.NETWORK_ONLY) { show("Camera: disabled in network-test build"); return; }
         if (!aircraftConnected) {
             release();
-            status.setText("Camera: connect the aircraft to see live video");
+            show("Camera: connect the aircraft to see live video");
             return;
         }
         if (codec == null && surface != null) codec = new DJICodecManager(context, surface, width, height);
@@ -47,7 +47,14 @@ final class LiveVideo implements TextureView.SurfaceTextureListener {
             if (feed != null) feed.addVideoDataListener(listener);
         }
         DJICodecManager decoder = codec;
-        status.setText(decoder != null && decoder.hasVideoData() ? "Camera: LIVE" : "Camera: waiting for video from aircraft");
+        show(decoder != null && decoder.hasVideoData() ? "Camera: LIVE" : "Camera: waiting for video from aircraft");
+    }
+
+    private String shown = "";
+    /** Camera transitions go into the diagnostic report; video failures are otherwise invisible remotely. */
+    private void show(String text) {
+        if (text.equals(shown)) return;
+        shown = text; status.setText(text); Diagnostics.record(text);
     }
 
     /** Activity no longer visible: stop feeding the decoder; update() resumes it. */

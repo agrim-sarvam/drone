@@ -58,7 +58,8 @@ function normalizePacket(data) {
             battery: optionalNumber(data.battery_percent ?? data.battery, 'battery', 0, 100),
             flightMode: data.flight_state ?? data.flightState ?? null,
             satellites, flying: data.flying ?? null, armed: null,
-            positionValid: valid, synthetic: modern ? data.synthetic : data.drone_id === 'TEST_DRONE'
+            // The phone bridge sends V1 (for the original laptop app) with an explicit synthetic flag on test packets.
+            positionValid: valid, synthetic: modern ? data.synthetic : data.synthetic === true || data.drone_id === 'TEST_DRONE'
         }
     };
 }
