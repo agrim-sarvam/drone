@@ -23,7 +23,7 @@ The owner must provide DJI_API_KEY and manually run the DJI-enabled build. It do
 
 ## UNKNOWN / not measured
 
-No actual phone, RC-N1, Air 2S, owner DJI key or operational logs were available. DJI registration, USB/RF compatibility, GPS accuracy, DJI Fly coexistence, screen-off/OEM battery policy, current Android 16-KB-page compatibility and actual flight behavior remain unverified. Initial registration/setup may require Internet; offline operation must be checked after setup while preserving the local network.
+No actual phone, RC-N1, Air 2S, owner DJI key or operational logs were available. DJI registration, USB/RF compatibility, GPS accuracy, DJI Fly coexistence, screen-off/OEM battery policy, Android 15+ and 16 KB-page devices (not supported by DJI SDK V4; the app uses V4 4.18) and actual flight behavior remain unverified. Initial registration/setup may require Internet; offline operation must be checked after setup while preserving the local network.
 
 Latency, packet loss under real RF/network conditions, CPU, thermal and battery use were not measured. Local loopback tests are correctness checks, not field performance measurements. The code sends telemetry only; the desktop's video remains a clearly labelled demo.
 

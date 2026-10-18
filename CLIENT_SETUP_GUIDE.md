@@ -37,6 +37,17 @@ You need: the **DJI-enabled** APK (not the network-test one), the laptop running
 
 Important: while the bridge owns the RC's USB connection, **DJI Fly cannot use it** — no live camera view from DJI Fly. Fly only with visual line of sight and normal safety procedures.
 
+**Phone and firmware.** Use an Android 10–14 phone (DJI SDK V4 does not support Android 15+). The SDK was tested by DJI with Air 2S firmware 02.04.25.00; note the aircraft and RC-N1 firmware versions shown in DJI Fly before the test and include them in the report.
+
+**Registration errors** (shown on the phone's top line):
+
+| Message contains | Meaning / fix |
+|---|---|
+| bundle / package not match | DJI key was created for a different package; it must be `com.sentinel.cop.dji` |
+| invalid / not exist / empty app key | wrong key in the build — rebuild with the correct `DJI_API_KEY` |
+| connect to internet / timeout | first registration needs Internet; connect the phone and retry |
+| max activation | the DJI developer account's activation limit (20 devices on basic accounts) is used up |
+
 ## 1. Owner: obtain the two matching applications
 
 1. Review and merge the bridge repair branch (both Android and desktop changes are required for schema V2).
@@ -126,4 +137,4 @@ Build the Windows package from repository root after tests: `npx electron-builde
 
 ## Verification limits
 
-Automated tests cover the real Java UDP sender/one-shot test, schema fixture shared with Node, no-fix/null handling, mid-flight altitude conversion, receiver parsing/ordering/timeouts/recovery, SQLite migration/recording/replay and display formatting. An APK build is not a hardware test. No code change can establish DJI key validity, the friend's phone/firmware/USB compatibility, DJI Fly coexistence, map availability or operational reliability without their bench evidence. SDK V4 4.16.2 remains pinned; newer Android versions and 16-KB-page-size devices need explicit compatibility validation. Do not claim every Android phone is supported.
+Automated tests cover the real Java UDP sender/one-shot test, schema fixture shared with Node, no-fix/null handling, mid-flight altitude conversion, receiver parsing/ordering/timeouts/recovery, SQLite migration/recording/replay and display formatting. An APK build is not a hardware test. No code change can establish DJI key validity, the friend's phone/firmware/USB compatibility, DJI Fly coexistence, map availability or operational reliability without their bench evidence. The app uses DJI Mobile SDK V4 4.18, the final V4 release (adapted to Android 13 and 14; Air 2S is not supported by SDK V5). DJI has stated V4 will not support Android 15 or 16 KB memory-page devices, so prefer a phone on Android 10–14. Do not claim every Android phone is supported.
