@@ -2,7 +2,8 @@ package com.sentinel.cop.dji;
 
 import android.app.Application;
 import android.content.Context;
-import com.secneo.sdk.Helper;
+// MSDK 4.18 renamed the loader (was com.secneo.sdk.Helper); the old name no longer starts the SDK.
+import com.cySdkyc.clx.Helper;
 
 public class BridgeApplication extends Application {
     private BridgeController controller;

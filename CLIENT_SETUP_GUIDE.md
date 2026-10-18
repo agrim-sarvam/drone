@@ -2,6 +2,41 @@
 
 This project is an offline desktop map/recording application. The Android bridge reads DJI aircraft state through Mobile SDK V4 and forwards telemetry over local UDP. It does not forward live camera video, control the aircraft, or read DJI Fly's screen. The desktop's video pane is labelled DEMO VIDEO.
 
+## Quick start (bench test, about 20 minutes)
+
+You need: the **DJI-enabled** APK (not the network-test one), the laptop running this branch, phone + USB **data** cable, RC-N1, Air 2S with **propellers removed**.
+
+**Laptop**
+
+1. Get this branch and start the app:
+   ```powershell
+   git fetch origin; git checkout <branch-or-main-after-merge>; git pull
+   npm ci; npm ci --prefix client; npm run build --prefix client
+   npm start
+   ```
+   If `npm ci` fails with a `node-gyp`/Python error, run `npm ci --ignore-scripts` then `node node_modules/electron/install.js` (the native modules ship prebuilt binaries).
+2. Allow UDP 14550 through Windows Firewall once (PowerShell **as Administrator**; hotspot networks are often marked Public, which blocks the usual prompt):
+   ```powershell
+   New-NetFirewallRule -DisplayName "Sentinel DJI telemetry" -Direction Inbound -Protocol UDP -LocalPort 14550 -Action Allow -Profile Private,Public
+   ```
+   Remove later with `Remove-NetFirewallRule -DisplayName "Sentinel DJI telemetry"`.
+3. Put laptop and phone on the same Wi-Fi, or connect the laptop to the **phone's hotspot** (most reliable in the field).
+4. Hardware Connection → **DJI SDK (UDP)**, IP `0.0.0.0`, port `14550` → **Connect to Drone**. Note the address shown after **Enter on phone:** (use the Wi-Fi/hotspot one).
+
+**Phone, without the drone**
+
+5. Uninstall any older Sentinel bridge, then install the new APK. Open it with **Internet available** (first DJI registration needs it) and grant all permissions. The top line must become **DJI SDK: REGISTERED**. If it shows `REGISTRATION FAILED code=…`, stop and send that code.
+6. Enter the laptop address and port `14550`, press **SEND STATIC TEST PACKET**. The laptop must show **SYNTHETIC NETWORK TEST**. If not: wrong IP, firewall, or the Wi-Fi blocks device-to-device traffic (guest Wi-Fi) — try the phone hotspot.
+
+**With the drone (props off)**
+
+7. Fully close DJI Fly. Power on Air 2S and RC-N1, plug the phone into the RC. When Android asks which app opens the DJI accessory, choose **Sentinel DJI Bridge**. Wait for **Aircraft: CONNECTED** and an updating **Sample age**.
+8. Press **START UDP**. The phone shows **Route: Wi-Fi …** (or *system default* on phone hotspot) and **Packets sent** increasing with **Send errors: 0**.
+9. Laptop shows **RECEIVING, WAITING FOR GPS FIX** indoors; outdoors with GPS it shows **RECEIVED** and the drone marker on the map. Compare battery and position with the drone.
+10. Press **SAVE DIAGNOSTIC REPORT** on the phone and **Save receiver report** on the laptop, and send both files back whether it worked or not.
+
+Important: while the bridge owns the RC's USB connection, **DJI Fly cannot use it** — no live camera view from DJI Fly. Fly only with visual line of sight and normal safety procedures.
+
 ## 1. Owner: obtain the two matching applications
 
 1. Review and merge the bridge repair branch (both Android and desktop changes are required for schema V2).

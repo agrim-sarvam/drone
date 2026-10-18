@@ -25,8 +25,10 @@ public class TelemetryManagerTest {
         assertTrue(Double.isNaN(sample.relative_altitude_m));
         assertEquals(-1,sample.battery);
     }
-    @Test public void gpsAvailabilityChecksDoNotRejectLegitimateZeroCoordinates() {
-        assertTrue(TelemetryManager.validPosition(0,0,12));
+    @Test public void gpsAvailabilityRejectsDjiNullIslandPlaceholderButNotZeroOnOneAxis() {
+        assertFalse(TelemetryManager.validPosition(0,0,12));
+        assertTrue(TelemetryManager.validPosition(0,77.209,12));
+        assertTrue(TelemetryManager.validPosition(28.6,0,12));
         assertFalse(TelemetryManager.validPosition(28,77,0));
         assertFalse(TelemetryManager.validPosition(Double.NaN,77,12));
         assertFalse(TelemetryManager.validPosition(91,77,12));

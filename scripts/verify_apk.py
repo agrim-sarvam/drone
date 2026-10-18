@@ -55,10 +55,14 @@ def main():
     args = parser.parse_args()
     with zipfile.ZipFile(args.apk) as archive:
         elements = manifest_elements(archive.read('AndroidManifest.xml'))
+        names = set(archive.namelist())
+    # Real phones are arm64; the DJI loader needs its JNI libraries present and extracted to disk.
+    assert 'lib/arm64-v8a/libSDKRelativeJNI.so' in names, 'DJI arm64 native libraries missing'
     app = next(attrs for name, attrs in elements if name == 'application')
     package = next(attrs['package'] for name, attrs in elements if name == 'manifest')
     key = next(attrs['value'] for name, attrs in elements if name == 'meta-data' and attrs.get('name') == 'com.dji.sdk.API_KEY')
     assert app['name'] == 'com.sentinel.cop.dji.BridgeApplication', 'SDK Application missing'
+    assert app.get('extractNativeLibs') == 0xffffffff, 'extractNativeLibs must be true for the DJI loader'
     assert any(name == 'service' and attrs.get('name') == 'com.sentinel.cop.dji.BridgeService' for name, attrs in elements), 'Foreground bridge service missing'
     assert key and key != 'MISSING_API_KEY', 'Missing DJI key'
     assert (key == 'NETWORK_TEST_ONLY') == args.network_only, 'Wrong APK mode'

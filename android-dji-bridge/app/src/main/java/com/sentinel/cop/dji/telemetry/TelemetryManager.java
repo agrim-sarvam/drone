@@ -30,7 +30,9 @@ public class TelemetryManager {
     }
     public static boolean validPosition(double lat, double lon, int satellites) {
         // Availability check, not an accuracy guarantee. SDK signal quality is checked separately.
-        return satellites >= 4 && Double.isFinite(lat) && Double.isFinite(lon)
+        // DJI firmware reports 0,0 as a placeholder before a fix; DJI's own UX SDK rejects it the same way.
+        boolean placeholder = Math.abs(lat) < 1e-6 && Math.abs(lon) < 1e-6;
+        return satellites >= 4 && Double.isFinite(lat) && Double.isFinite(lon) && !placeholder
                 && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
     }
 }

@@ -25,9 +25,11 @@
     <application
         android:name=".BridgeApplication"
         android:allowBackup="false"
+        android:extractNativeLibs="true"
         android:label="${bridgeLabel}"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar"
         android:usesCleartextTraffic="true">
+        <uses-library android:name="org.apache.http.legacy" android:required="false" />
         <service android:name=".BridgeService" android:exported="false"
             android:foregroundServiceType="connectedDevice" />
         

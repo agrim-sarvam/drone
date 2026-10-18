@@ -72,8 +72,10 @@ public final class BridgeController {
                         main.post(() -> {
                             registering = false;
                             boolean ok = error == DJISDKError.REGISTRATION_SUCCESS;
-                            sdk = ok ? "REGISTERED" : "REGISTRATION FAILED code=" + (error == null ? "unknown" : error.getErrorCode())
-                                    + " (check key, permissions and Internet)";
+                            // DJI documents error names/descriptions, not numeric codes (e.g. "bundle not match" = package/key mismatch).
+                            sdk = ok ? "REGISTERED" : "REGISTRATION FAILED: " + (error == null ? "unknown"
+                                    : error.getDescription() + " (code " + error.getErrorCode() + ")")
+                                    + " - check key, package, permissions and Internet";
                             Diagnostics.record("SDK registration " + (ok ? "success" : sdk));
                             if (ok) {
                                 DJISDKManager.getInstance().startConnectionToProduct();
