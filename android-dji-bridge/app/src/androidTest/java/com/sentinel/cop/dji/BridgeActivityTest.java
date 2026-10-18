@@ -92,6 +92,27 @@ public class BridgeActivityTest {
             // No-fix samples are held on the phone: the original laptop app cannot represent them.
             assertEquals(30, controller().exporter.packetsSent.get());
             assertEquals(10, controller().exporter.waitingForFix.get());
+            // Live view to the laptop: same sender the camera view feeds, with test-pattern frames.
+            assertTrue(controller().video.isRunning());
+            for (int i = 0; i < 8; i++) {
+                android.graphics.Bitmap frame = android.graphics.Bitmap.createBitmap(VideoFrameSender.WIDTH,
+                        VideoFrameSender.HEIGHT, android.graphics.Bitmap.Config.ARGB_8888);
+                android.graphics.Canvas canvas = new android.graphics.Canvas(frame);
+                android.graphics.Paint paint = new android.graphics.Paint();
+                for (int x = 0; x < VideoFrameSender.WIDTH; x += 8) {
+                    paint.setColor(android.graphics.Color.rgb(x % 256, (x * 3 + i * 20) % 256, 128));
+                    canvas.drawRect(x, 0, x + 8, VideoFrameSender.HEIGHT, paint);
+                }
+                paint.setColor(android.graphics.Color.WHITE); paint.setTextSize(48);
+                canvas.drawText("frame " + i, 40, 180, paint);
+                controller().video.offer(frame);
+                SystemClock.sleep(120);
+            }
+            long videoUntil = SystemClock.uptimeMillis() + 3000;
+            while (controller().video.framesSent.get() < 5 && SystemClock.uptimeMillis() < videoUntil) SystemClock.sleep(50);
+            assertTrue("video frames sent: " + controller().video.framesSent.get(), controller().video.framesSent.get() >= 5);
+            assertEquals(0, controller().video.framesTooLarge.get());
+            assertEquals(0, controller().video.sendErrors.get());
             assertEquals(0, controller().exporter.sendErrors.get());
         } finally {
             InstrumentationRegistry.getInstrumentation().getTargetContext().stopService(new android.content.Intent(

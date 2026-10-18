@@ -21,6 +21,11 @@
     z-index: 1;
 }
 
+/* Show the whole aircraft picture; the panel is taller than the 16:9 frame. */
+.sensor-live-frame {
+    object-fit: contain;
+}
+
 .sensor-canvas {
     width: 100%;
     height: 100%;

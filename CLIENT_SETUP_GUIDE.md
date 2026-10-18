@@ -1,6 +1,6 @@
 # Sentinel DJI bridge: owner setup and friend handoff
 
-This project is an offline desktop map/recording application. The Android bridge reads DJI aircraft state through Mobile SDK V4 and forwards telemetry over local UDP. It shows the aircraft's live camera on the phone (not forwarded to the laptop). It does not control the aircraft or read DJI Fly's screen. The desktop's video pane is labelled DEMO VIDEO.
+This project is an offline desktop map/recording application. The Android bridge reads DJI aircraft state through Mobile SDK V4 and forwards telemetry over local UDP. It shows the aircraft's live camera on the phone and sends it to the laptop (about 10 frames per second, 640×360, on the telemetry port + 1). It does not control the aircraft or read DJI Fly's screen. The desktop's video pane is labelled DEMO VIDEO.
 
 ## Quick start (bench test, about 20 minutes)
 
@@ -15,9 +15,9 @@ You need: the **DJI-enabled** APK (not the network-test one), the laptop running
    npm start
    ```
    If `npm ci` fails with a `node-gyp`/Python error, run `npm ci --ignore-scripts` then `node node_modules/electron/install.js` (the native modules ship prebuilt binaries).
-2. Allow UDP 14550 through Windows Firewall once (PowerShell **as Administrator**; hotspot networks are often marked Public, which blocks the usual prompt):
+2. Allow UDP 14550 (telemetry) and 14551 (live video) through Windows Firewall once (PowerShell **as Administrator**; hotspot networks are often marked Public, which blocks the usual prompt):
    ```powershell
-   New-NetFirewallRule -DisplayName "Sentinel DJI telemetry" -Direction Inbound -Protocol UDP -LocalPort 14550 -Action Allow -Profile Private,Public
+   New-NetFirewallRule -DisplayName "Sentinel DJI telemetry" -Direction Inbound -Protocol UDP -LocalPort 14550-14551 -Action Allow -Profile Private,Public
    ```
    Remove later with `Remove-NetFirewallRule -DisplayName "Sentinel DJI telemetry"`.
 3. Put laptop and phone on the same Wi-Fi, or connect the laptop to the **phone's hotspot** (most reliable in the field).
@@ -31,13 +31,13 @@ You need: the **DJI-enabled** APK (not the network-test one), the laptop running
 **With the drone (props off)**
 
 7. Fully close DJI Fly. Power on Air 2S and RC-N1, plug the phone into the RC. When Android asks which app opens the DJI accessory, choose **Sentinel DJI Bridge**. Wait for **Aircraft: CONNECTED** and an updating **Sample age**. The camera picture appears at the top of the bridge app and the line under it says **Camera: LIVE** (usually within a few seconds).
-8. Press **START UDP**. The phone shows **Route: Wi-Fi …** (or *system default* on phone hotspot) and **Packets sent** increasing with **Send errors: 0**.
+8. Press **START UDP**. The phone shows **Route: Wi-Fi …** (or *system default* on phone hotspot) and **Packets sent** increasing with **Send errors: 0**. While the camera is live, **Video frames to laptop** also counts up and the laptop's Sensor Video panel shows the drone camera with **LIVE — DJI camera via phone** (keep the bridge app on screen; the laptop shows **VIDEO LOST** if frames stop).
 9. Indoors the phone shows **Held until GPS fix** counting up and the laptop keeps waiting: positions are only sent once the drone has GPS. Outdoors with GPS the laptop shows **RECEIVED** and the drone marker on the map. Compare battery and position with the drone.
 
 The phone sends the original telemetry format (schema 1), so the laptop app the tester already has works unchanged; the updated laptop app also accepts it.
 10. Press **SAVE DIAGNOSTIC REPORT** on the phone and **Save receiver report** on the laptop, and send both files back whether it worked or not.
 
-Important: while the bridge owns the RC's USB connection, **DJI Fly cannot use it**. The bridge app shows the live camera on the phone instead (video is not sent to the laptop). It is a plain view without DJI Fly's flight overlays and warnings, so fly only with visual line of sight and normal safety procedures.
+Important: while the bridge owns the RC's USB connection, **DJI Fly cannot use it**. The bridge app shows the live camera on the phone instead, and sends it to the updated laptop app. It is a plain view without DJI Fly's flight overlays and warnings, so fly only with visual line of sight and normal safety procedures.
 
 **Phone and firmware.** Use an Android 10–14 phone (DJI SDK V4 does not support Android 15+). The SDK was tested by DJI with Air 2S firmware 02.04.25.00; note the aircraft and RC-N1 firmware versions shown in DJI Fly before the test and include them in the report.
 

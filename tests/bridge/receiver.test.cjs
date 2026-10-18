@@ -84,6 +84,23 @@ test('phone bridge V1 packet reaches the original laptop receiver and its screen
     assert.deepEqual(renderOriginalUi(data),['28.613900','77.209000','40.0','-90.0','0.0']);
 });
 
+test('video receiver passes whole JPEG frames and rejects anything else', async t => {
+    const {VideoFrameReceiver} = require('../../adapters/dji/VideoFrameReceiver');
+    const receiver = new VideoFrameReceiver();
+    const sender = dgram.createSocket('udp4');
+    t.after(()=>{ sender.close(); receiver.stop(); });
+    await receiver.start({host:'127.0.0.1',port:0});
+    const port = receiver.getDiagnostics().port;
+    const frames = [];
+    receiver.on('frame', frame => frames.push(frame));
+    const jpeg = Buffer.from([0xff,0xd8,0xff,0xe0,1,2,3,0xff,0xd9]);
+    for (const data of [jpeg, Buffer.from('not a jpeg'), Buffer.from([0xff,0xd8,1,2,3])]) sender.send(data,port,'127.0.0.1');
+    await delay(100);
+    assert.equal(frames.length,1);
+    assert.deepEqual(frames[0],jpeg);
+    assert.equal(receiver.getDiagnostics().rejected,2);
+});
+
 test('listener with no packets yet stays waiting instead of reporting lost telemetry', async t => {
     const {adapter} = await receiver(t,100);
     await delay(250);

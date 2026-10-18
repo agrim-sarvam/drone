@@ -1,9 +1,31 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './SensorFeed.css';
 import { formatNumber, altitudeLabel } from '../../telemetryDisplay';
 
+// Frames older than this count as lost: an old picture must not look live.
+const LIVE_TIMEOUT_MS = 2000;
+
 const SensorFeed = ({ telemetry }) => {
     const canvasRef = useRef(null);
+    const [frameUrl, setFrameUrl] = useState(null);
+    const [lastFrameAt, setLastFrameAt] = useState(0);
+    const [now, setNow] = useState(Date.now());
+
+    // Live view from the phone bridge: one JPEG per message.
+    useEffect(() => {
+        if (!window.electronAPI?.onVideoFrame) return;
+        let current = null;
+        const stop = window.electronAPI.onVideoFrame(jpeg => {
+            const url = URL.createObjectURL(new Blob([jpeg], { type: 'image/jpeg' }));
+            if (current) URL.revokeObjectURL(current);
+            current = url;
+            setFrameUrl(url);
+            setLastFrameAt(Date.now());
+        });
+        const timer = setInterval(() => setNow(Date.now()), 500);
+        return () => { stop(); clearInterval(timer); if (current) URL.revokeObjectURL(current); };
+    }, []);
+    const live = frameUrl !== null && now - lastFrameAt < LIVE_TIMEOUT_MS;
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -77,14 +99,18 @@ const SensorFeed = ({ telemetry }) => {
 
     return (
         <div className="sensor-feed-container" style={{position: 'relative'}}>
-            <video 
-                src="./test-video.mp4"
-                autoPlay 
-                loop 
-                muted 
-                playsInline
-                className="sensor-video"
-            />
+            {live ? (
+                <img src={frameUrl} alt="Live DJI camera" className="sensor-video sensor-live-frame" />
+            ) : (
+                <video
+                    src="./test-video.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="sensor-video"
+                />
+            )}
             <canvas 
                 ref={canvasRef} 
                 width={330} 
@@ -92,7 +118,8 @@ const SensorFeed = ({ telemetry }) => {
                 className="sensor-canvas"
             />
             <div className="sensor-overlay-text">
-                <span className="live-badge">DEMO VIDEO — not a DJI live feed</span>
+                <span className="live-badge">{live ? 'LIVE — DJI camera via phone'
+                    : frameUrl ? 'VIDEO LOST — showing demo clip' : 'DEMO VIDEO — not a DJI live feed'}</span>
             </div>
         </div>
     );

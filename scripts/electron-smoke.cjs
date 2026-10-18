@@ -27,6 +27,16 @@ const fixture = require('../tests/fixtures/dji-v2.json');
   await settings.locator('input[type=number]').nth(1).fill('500');
   await page.getByRole('button',{name:'Connect to Drone',exact:true}).click();
   await page.getByText('Telemetry: WAITING FOR TELEMETRY',{exact:true}).waitFor();
+  // Live view from the phone arrives on the telemetry port + 1 as one JPEG per datagram.
+  const jpeg = Buffer.from(await page.evaluate(() => {
+   const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360;
+   const ctx = canvas.getContext('2d'); ctx.fillStyle = '#3a7'; ctx.fillRect(0, 0, 640, 360);
+   return canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+  }), 'base64');
+  await new Promise((resolve,reject)=>transmitter.send(jpeg,port+1,'127.0.0.1',e=>e?reject(e):resolve()));
+  await page.getByText('LIVE — DJI camera via phone',{exact:true}).waitFor();
+  await page.locator('img.sensor-live-frame').waitFor();
+  await page.getByText('VIDEO LOST — showing demo clip',{exact:true}).waitFor({timeout:5000});
   const send=packet=>new Promise((resolve,reject)=>transmitter.send(Buffer.from(JSON.stringify(packet)),port,'127.0.0.1',e=>e?reject(e):resolve()));
   await page.getByRole('button',{name:'Record',exact:true}).click();
   await send({...fixture,timestamp:Date.now()});

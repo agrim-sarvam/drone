@@ -23,6 +23,8 @@ public final class BridgeController {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final CopyOnWriteArraySet<Runnable> observers = new CopyOnWriteArraySet<>();
     public final TelemetryUdpExporter exporter = new TelemetryUdpExporter();
+    /** Live view to the laptop; runs alongside telemetry so stats survive Activity recreation. */
+    public final VideoFrameSender video;
     private final TelemetryManager manager = new TelemetryManager();
     public volatile String sdk = BuildConfig.NETWORK_ONLY ? "NETWORK TEST ONLY (DJI disabled)" : "NOT REGISTERED";
     public volatile String aircraft = "DISCONNECTED";
@@ -43,7 +45,9 @@ public final class BridgeController {
 
     BridgeController(Context context) {
         this.context = context.getApplicationContext();
-        exporter.setRoute(new LocalNetworkRoute(this.context));
+        LocalNetworkRoute route = new LocalNetworkRoute(this.context);
+        exporter.setRoute(route);
+        video = new VideoFrameSender(route);
         exporter.setObserver((success, detail) -> {
             String state = success ? "SENDING (not acknowledged)" : detail;
             udp = state;
@@ -191,12 +195,14 @@ public final class BridgeController {
     }
     public void start(Destination target) throws Exception {
         exporter.start(target);
+        // Video is best effort: a failure here must never stop telemetry.
+        try { video.start(target); } catch (Exception e) { Diagnostics.record("Video sender not started: " + e.getClass().getSimpleName()); }
         udp = "STARTED, waiting for aircraft samples";
         lastSendState = "";
         Diagnostics.record("UDP started via " + exporter.route()); notifyObservers();
     }
     public void stop() {
-        exporter.stop(); udp = "STOPPED";
+        exporter.stop(); video.stop(); udp = "STOPPED";
         Diagnostics.record("UDP stopped"); notifyObservers();
     }
     public String diagnosticReport() {
@@ -206,6 +212,8 @@ public final class BridgeController {
                 + "\nPermissions missing: " + (missingPermissions.isEmpty() ? "none" : missingPermissions)
                 + "\nProduct: " + product + "\nAircraft: " + aircraft + "\nUDP: " + udp + "\nRoute: " + exporter.route()
                 + "\nPackets sent: " + exporter.packetsSent.get() + "\nSend errors: " + exporter.sendErrors.get() + "\nHeld until GPS fix: " + exporter.waitingForFix.get()
+                + "\nVideo frames to laptop: " + video.framesSent.get() + " (port " + video.port() + ", too large "
+                + video.framesTooLarge.get() + ", errors " + video.sendErrors.get() + ")"
                 + "\nSample age ms: " + (latest == null ? "none" : Math.max(0, System.currentTimeMillis() - latest.timestamp)));
     }
 }

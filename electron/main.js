@@ -169,17 +169,26 @@ ipcMain.handle('dji:connect', async (event, config) => {
   simulator.reset();
   try {
       await dji.connect(config);
-      return { success: true };
   } catch (err) {
       return { success: false, error: err.message };
   }
+  // The phone sends its live view to the telemetry port + 1. Video is best effort: never fail telemetry for it.
+  const telemetryPort = config?.port ?? 14550;
+  if (telemetryPort > 0 && telemetryPort < 65535) {
+    try { await video.start({ host: config?.host ?? '0.0.0.0', port: telemetryPort + 1 }); }
+    catch (err) { console.error('Live video listener not started:', err.message); }
+  }
+  return { success: true };
 });
 ipcMain.handle('dji:disconnect', () => {
   dji.disconnect();
+  video.stop();
   attachTelemetrySource(simulator);
   return true;
 });
-ipcMain.handle('dji:diagnostics', () => dji.getDiagnostics());
+ipcMain.handle('dji:diagnostics', () => ({ ...dji.getDiagnostics(), video: video.getDiagnostics() }));
+const video = require('../adapters/dji/VideoFrameReceiver');
+video.on('frame', frame => { if (mainWindow) mainWindow.webContents.send('video:frame', frame); });
 // The phone needs the laptop's LAN address; listing it avoids gateway/VPN/loopback mistakes during setup.
 ipcMain.handle('network:addresses', () => Object.entries(require('os').networkInterfaces())
   .flatMap(([name, entries]) => (entries || [])

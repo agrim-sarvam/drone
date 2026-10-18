@@ -39,7 +39,7 @@ public class MainActivity extends Activity {
         startButton = findViewById(R.id.start_button);
         testButton = findViewById(R.id.test_button);
         TextureView videoView = findViewById(R.id.video_view);
-        video = new LiveVideo(this, findViewById(R.id.video_status));
+        video = new LiveVideo(this, videoView, findViewById(R.id.video_status), controller.video);
         videoView.setSurfaceTextureListener(video);
         // The aircraft streams 16:9; size the preview to match the screen width.
         videoView.post(() -> {
@@ -116,7 +116,8 @@ public class MainActivity extends Activity {
                 + "\nRoute: " + controller.exporter.route()
                 + "\nPackets sent: " + controller.exporter.packetsSent.get() + " (not acknowledged)"
                 + "\nSend errors: " + controller.exporter.sendErrors.get()
-                + "\nHeld until GPS fix: " + controller.exporter.waitingForFix.get());
+                + "\nHeld until GPS fix: " + controller.exporter.waitingForFix.get()
+                + "\nVideo frames to laptop: " + controller.video.framesSent.get());
         startButton.setText(running ? "STOP UDP" : "START UDP");
         // Some OEM battery policies throttle background networking even with a foreground service.
         if (running) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

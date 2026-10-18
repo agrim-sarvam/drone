@@ -61,6 +61,11 @@ contextBridge.exposeInMainWorld(
         ipcRenderer.on('simulator:status', listener);
         return () => ipcRenderer.removeListener('simulator:status', listener);
     },
+    onVideoFrame: (callback) => {
+        const listener = (_event, jpeg) => callback(jpeg);
+        ipcRenderer.on('video:frame', listener);
+        return () => ipcRenderer.removeListener('video:frame', listener);
+    },
     onReplayStatus: (callback) => {
         const listener = (_event, status) => callback(status);
         ipcRenderer.on('replay:status', listener);

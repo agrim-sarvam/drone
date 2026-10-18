@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const dgram = require('node:dgram');
 const assert = require('node:assert/strict');
 const { DJIAdapter } = require('../adapters/dji/DJIAdapter');
+const { VideoFrameReceiver } = require('../adapters/dji/VideoFrameReceiver');
 const original = require('../tests/legacy/OriginalDJIAdapter.cjs');
 const renderOriginalUi = require('../tests/legacy/originalUi.cjs');
 
@@ -17,9 +18,12 @@ async function listen(port, output) {
     const report = {
         datagrams: 0,
         updated: { statuses: [], aircraft: 0, synthetic: 0, sample: null },
-        original: { telemetry: 0, renderFailures: 0, lastRender: null }
+        original: { telemetry: 0, renderFailures: 0, lastRender: null },
+        video: { frames: 0, bytes: 0 }
     };
-    const write = () => fs.writeFileSync(output, JSON.stringify({ ...report, updatedDiagnostics: updated.getDiagnostics() }, null, 2));
+    const video = new VideoFrameReceiver();
+    const write = () => fs.writeFileSync(output, JSON.stringify({ ...report, updatedDiagnostics: updated.getDiagnostics(),
+        videoDiagnostics: video.getDiagnostics() }, null, 2));
     updated.on('status', status => { if (report.updated.statuses.at(-1) !== status) report.updated.statuses.push(status); write(); });
     updated.on('telemetry', data => {
         if (data.status.synthetic) report.updated.synthetic++; else { report.updated.aircraft++; report.updated.sample = data; }
@@ -33,13 +37,16 @@ async function listen(port, output) {
     await updated.connect({ host: '127.0.0.1', port: 0, timeout: 60000 });
     await original.connect({ host: '127.0.0.1', port: 0, timeout: 60000 });
     const targets = [updated.udpSocket.address().port, original.udpSocket.address().port];
+    // The phone's live view arrives directly on port + 1 (JPEG per datagram).
+    video.on('frame', frame => { report.video.frames++; report.video.bytes = frame.length; write(); });
+    await video.start({ host: '0.0.0.0', port: port + 1 });
     const front = dgram.createSocket('udp4');
     front.on('message', message => {
         report.datagrams++;
         for (const target of targets) front.send(message, target, '127.0.0.1');
     });
     front.bind(port, '0.0.0.0', () => console.log(`Desktop receivers (updated + original) listening on UDP ${port}`));
-    process.on('SIGTERM', () => { write(); front.close(); updated.disconnect(); original.disconnect(); process.exit(0); });
+    process.on('SIGTERM', () => { write(); front.close(); video.stop(); updated.disconnect(); original.disconnect(); process.exit(0); });
 }
 
 if (mode === 'listen') {
@@ -55,6 +62,9 @@ if (mode === 'listen') {
     for (const status of ['TEST_TELEMETRY_RECEIVED', 'TELEMETRY_RECEIVED']) assert.ok(report.updated.statuses.includes(status), status);
     assert.equal(report.original.telemetry, 31, 'original laptop receiver dropped packets');
     assert.equal(report.original.renderFailures, 0, 'original laptop screen would crash on these packets');
+    assert.ok(report.video.frames >= 5, `phone live-view frames reaching the laptop: ${report.video.frames}`);
+    assert.equal(report.videoDiagnostics.rejected, 0, 'laptop rejected frames the phone produced');
+    assert.ok(report.video.bytes > 1000 && report.video.bytes <= 60000, 'frame is a real JPEG within one datagram');
     const { position, attitude, velocity, status } = report.updated.sample;
     assert.ok(Math.abs(position.longitude - 77.209) < 1e-9);
     assert.equal(position.altitudeReference, 'legacy-unspecified');
