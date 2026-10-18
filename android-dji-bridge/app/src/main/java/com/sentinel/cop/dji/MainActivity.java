@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.hardware.usb.UsbManager;
+import android.view.TextureView;
 import android.view.WindowManager;
 import android.widget.*;
 import com.sentinel.cop.dji.telemetry.*;
@@ -21,6 +22,7 @@ public class MainActivity extends Activity {
     private TextView sdkText, aircraftText, udpText, telemetryText;
     private EditText ipInput, portInput;
     private Button startButton, testButton;
+    private LiveVideo video;
     private final Runnable refresh = this::render;
     private static final int PERMISSIONS = 100, EXPORT = 101;
 
@@ -36,6 +38,14 @@ public class MainActivity extends Activity {
         portInput = findViewById(R.id.port_input);
         startButton = findViewById(R.id.start_button);
         testButton = findViewById(R.id.test_button);
+        TextureView videoView = findViewById(R.id.video_view);
+        video = new LiveVideo(this, findViewById(R.id.video_status));
+        videoView.setSurfaceTextureListener(video);
+        // The aircraft streams 16:9; size the preview to match the screen width.
+        videoView.post(() -> {
+            videoView.getLayoutParams().height = videoView.getWidth() * 9 / 16;
+            videoView.requestLayout();
+        });
         SharedPreferences settings = getSharedPreferences("bridge", MODE_PRIVATE);
         ipInput.setText(settings.getString("host", ""));
         portInput.setText(settings.getString("port", "14550"));
@@ -62,7 +72,7 @@ public class MainActivity extends Activity {
         }
     }
     @Override protected void onStart() { super.onStart(); controller.observe(refresh); }
-    @Override protected void onStop() { controller.removeObserver(refresh); super.onStop(); }
+    @Override protected void onStop() { controller.removeObserver(refresh); video.pause(); super.onStop(); }
     private Destination destination() {
         Destination target = Destination.parse(ipInput.getText().toString(), portInput.getText().toString());
         getSharedPreferences("bridge", MODE_PRIVATE).edit().putString("host", target.host)
@@ -93,6 +103,7 @@ public class MainActivity extends Activity {
     private void render() {
         sdkText.setText("DJI SDK: " + controller.sdk);
         aircraftText.setText("Aircraft: " + controller.aircraft);
+        video.update(controller.aircraft.startsWith("CONNECTED"));
         boolean running = controller.exporter.isRunning();
         udpText.setText("UDP: " + controller.udp + "\nEffective destination: " + controller.exporter.effectiveDestination()
                 + "\nRoute: " + controller.exporter.route()

@@ -18,6 +18,9 @@ import static org.junit.Assert.*;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static org.hamcrest.Matchers.containsString;
 
 @RunWith(AndroidJUnit4.class)
 public class BridgeActivityTest {
@@ -38,6 +41,8 @@ public class BridgeActivityTest {
         onView(withId(R.id.start_button)).perform(scrollTo(),click());
         assertFalse(controller().exporter.isRunning());
         assertTrue(controller().sdk.contains("NETWORK TEST ONLY"));
+        // The camera panel lays out without touching the DJI decoder when DJI is disabled.
+        onView(withId(R.id.video_status)).check(matches(withText(containsString("network-test build"))));
     }
     @Test public void phoneTestButtonSendsARealUdpPacketWithLiveSenderStopped() throws Exception {
         try(DatagramSocket receiver=new DatagramSocket(0)) {
