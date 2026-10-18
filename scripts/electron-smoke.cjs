@@ -20,6 +20,7 @@ const fixture = require('../tests/fixtures/dji-v2.json');
   const page=await app.firstWindow();
   page.on('pageerror',error=>errors.push(error.message));
   await page.getByRole('button',{name:'Connect to Drone',exact:true}).waitFor();
+  await page.locator('.local-addresses').filter({hasText:'Enter on phone:'}).waitFor();
   const settings=page.locator('.connection-settings');
   await settings.locator('input[type=text]').fill('127.0.0.1');
   await settings.locator('input[type=number]').nth(0).fill(String(port));

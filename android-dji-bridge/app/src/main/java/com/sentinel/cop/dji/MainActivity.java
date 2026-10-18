@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.hardware.usb.UsbManager;
+import android.view.WindowManager;
 import android.widget.*;
 import com.sentinel.cop.dji.telemetry.*;
 import java.io.OutputStream;
@@ -94,17 +95,22 @@ public class MainActivity extends Activity {
         aircraftText.setText("Aircraft: " + controller.aircraft);
         boolean running = controller.exporter.isRunning();
         udpText.setText("UDP: " + controller.udp + "\nEffective destination: " + controller.exporter.effectiveDestination()
+                + "\nRoute: " + controller.exporter.route()
                 + "\nPackets sent: " + controller.exporter.packetsSent.get() + " (not acknowledged)"
                 + "\nSend errors: " + controller.exporter.sendErrors.get());
         startButton.setText(running ? "STOP UDP" : "START UDP");
+        // Some OEM battery policies throttle background networking even with a foreground service.
+        if (running) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         ipInput.setEnabled(!running); portInput.setEnabled(!running);
         TelemetryData sample = controller.latest;
         if (sample == null) telemetryText.setText("No aircraft samples. Network test works without a drone.");
         else telemetryText.setText(String.format(Locale.US,
-                "Sample age: %d ms\nGPS: %s (%d satellites)\nLAT: %s\nLON: %s\nHeight above takeoff: %.1f m\nSpeed: %.1f m/s\nBattery: %s",
+                "Sample age: %d ms\nGPS: %s (%d satellites)\nLAT: %s\nLON: %s\nHeight above takeoff: %s m\nSpeed: %.1f m/s\nBattery: %s",
                 Math.max(0, System.currentTimeMillis() - sample.timestamp), sample.position_valid ? "AVAILABLE" : "WAITING FOR FIX",
                 sample.gps_satellites, sample.position_valid ? String.format(Locale.US, "%.6f", sample.lat) : "--",
-                sample.position_valid ? String.format(Locale.US, "%.6f", sample.lon) : "--", sample.relative_altitude_m,
+                sample.position_valid ? String.format(Locale.US, "%.6f", sample.lon) : "--",
+                Double.isFinite(sample.relative_altitude_m) ? String.format(Locale.US, "%.1f", sample.relative_altitude_m) : "--",
                 sample.speed_mps, sample.battery < 0 ? "unknown" : sample.battery + "%"));
     }
     private String[] requiredPermissions() {

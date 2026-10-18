@@ -61,6 +61,28 @@ test('UDP fixture, sequence rejection, session restart, timeout and recovery', a
     assert.equal(adapter.status,'TELEMETRY_RECEIVED');
 });
 
+test('listener with no packets yet stays waiting instead of reporting lost telemetry', async t => {
+    const {adapter} = await receiver(t,100);
+    await delay(250);
+    assert.equal(adapter.status,'UDP_LISTENER_ACTIVE');
+});
+
+test('simulator script output is accepted as aircraft telemetry (no fix, then fix)', async t => {
+    const {adapter} = await receiver(t,2000);
+    const port = adapter.udpSocket.address().port;
+    const seen = [];
+    adapter.on('telemetry', data => seen.push(data));
+    const {spawn} = require('node:child_process');
+    const simulator = spawn(process.execPath,[require('node:path').join(__dirname,'../../scripts/simulate_dji_stream.js'),'127.0.0.1',String(port)],{stdio:'ignore'});
+    t.after(()=>simulator.kill());
+    for (let i=0; i<100 && !seen.some(data=>data.position.valid); i++) await delay(100);
+    assert.ok(seen.some(data=>data.position.valid),'simulator never reached a GPS fix');
+    assert.equal(adapter.diagnostics.rejected,0);
+    assert.ok(seen.some(data=>!data.position.valid));
+    assert.equal(seen.at(-1).position.altitudeReference,'takeoff');
+    assert.equal(seen.at(-1).status.synthetic,false);
+});
+
 test('malformed packets never emit telemetry or promote receiver state', async t => {
     const {adapter,send} = await receiver(t);
     let count=0; adapter.on('telemetry',()=>count++);

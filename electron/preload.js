@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld(
     connectDJI: (config) => ipcRenderer.invoke('dji:connect', config),
     disconnectDJI: () => ipcRenderer.invoke('dji:disconnect'),
     getDJIDiagnostics: () => ipcRenderer.invoke('dji:diagnostics'),
+    getLocalAddresses: () => ipcRenderer.invoke('network:addresses'),
 
     // Mission
     saveMission: (name, waypoints) => ipcRenderer.invoke('mission:save', { name, waypoints }),

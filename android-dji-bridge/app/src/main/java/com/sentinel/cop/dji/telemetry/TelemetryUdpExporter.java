@@ -1,6 +1,7 @@
 package com.sentinel.cop.dji.telemetry;
 
 import org.json.JSONObject;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -13,26 +14,37 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class TelemetryUdpExporter {
     public interface Result { void complete(boolean success, String detail); }
+    /** Chooses the network a socket uses. Returns a description safe for diagnostics (no addresses). */
+    public interface Route { String bind(DatagramSocket socket, InetAddress destination) throws IOException; }
+    // DJI flight-controller state arrives at ~10 Hz with jitter; a 100 ms floor silently dropped about half of it.
+    static final long MIN_SEND_INTERVAL_NANOS = 50_000_000L;
+    private static final long REBIND_INTERVAL_NANOS = 1_000_000_000L;
     private ThreadPoolExecutor worker;
     private DatagramSocket socket;
     private Destination destination;
     private volatile boolean running;
     private long lastSendNanos;
+    private long lastRebindNanos;
     private long sequence;
     private String session;
+    private volatile Route route = (socket, destination) -> "system default";
+    private volatile String routeDescription = "Not started";
     public final AtomicLong packetsSent = new AtomicLong();
     public final AtomicLong sendErrors = new AtomicLong();
     private Result observer = (success, detail) -> { };
 
     public synchronized void setObserver(Result observer) { this.observer = observer; }
+    public void setRoute(Route route) { this.route = route; }
+    public String route() { return routeDescription; }
+
     public synchronized void start(Destination destination) throws Exception {
         stop();
-        DatagramSocket opened = new DatagramSocket();
         this.destination = destination;
-        socket = opened;
+        socket = open(destination);
         session = UUID.randomUUID().toString();
         sequence = 0;
         lastSendNanos = 0;
+        lastRebindNanos = System.nanoTime();
         packetsSent.set(0);
         sendErrors.set(0);
         worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
@@ -50,10 +62,22 @@ public class TelemetryUdpExporter {
     public synchronized String effectiveDestination() {
         return destination == null ? "Not configured" : destination.host + ":" + destination.port;
     }
+    private DatagramSocket open(Destination target) throws IOException {
+        DatagramSocket opened = new DatagramSocket();
+        routeDescription = bindRoute(opened, target);
+        return opened;
+    }
+    private String bindRoute(DatagramSocket opened, Destination target) {
+        try { return route.bind(opened, InetAddress.getByName(target.host)); }
+        catch (IOException | RuntimeException e) {
+            // An unbound socket still works on a phone hotspot or when Wi-Fi is the default network.
+            return "system default (network bind failed: " + e.getClass().getSimpleName() + ")";
+        }
+    }
     public synchronized void sendTelemetry(TelemetryData data) {
         if (!running) return;
         long now = System.nanoTime();
-        if (lastSendNanos != 0 && now - lastSendNanos < 100_000_000L) return;
+        if (lastSendNanos != 0 && now - lastSendNanos < MIN_SEND_INTERVAL_NANOS) return;
         lastSendNanos = now;
         final DatagramSocket activeSocket = socket;
         final Destination target = destination;
@@ -74,15 +98,30 @@ public class TelemetryUdpExporter {
                     if (activeSocket == socket && !activeSocket.isClosed()) {
                         sendErrors.incrementAndGet();
                         callback.complete(false, "UDP send failed: " + e.getClass().getSimpleName());
+                        rebindAfterFailure();
                     }
                 }
             }
         });
     }
+    /** A socket bound to a Wi-Fi network that has since dropped keeps failing; reopen it on the current route. */
+    private void rebindAfterFailure() {
+        long now = System.nanoTime();
+        if (!running || now - lastRebindNanos < REBIND_INTERVAL_NANOS) return;
+        lastRebindNanos = now;
+        try {
+            DatagramSocket replacement = open(destination);
+            socket.close();
+            socket = replacement;
+        } catch (IOException e) {
+            routeDescription = "reopen failed: " + e.getClass().getSimpleName();
+        }
+    }
     /** One-shot network test works with real telemetry stopped; it never changes the live destination. */
     public void sendTestPacket(Destination target, Result callback) {
         new Thread(() -> {
             try (DatagramSocket testSocket = new DatagramSocket()) {
+                String via = bindRoute(testSocket, target);
                 TelemetryData data = new TelemetryData();
                 data.drone_id = "SYNTHETIC_NETWORK_TEST";
                 data.timestamp = System.currentTimeMillis();
@@ -93,7 +132,7 @@ public class TelemetryUdpExporter {
                 data.battery = -1;
                 byte[] payload = encode(data, UUID.randomUUID().toString(), 0, true);
                 testSocket.send(new DatagramPacket(payload, payload.length, InetAddress.getByName(target.host), target.port));
-                callback.complete(true, "TEST sent; confirm SYNTHETIC_NETWORK_TEST on laptop");
+                callback.complete(true, "TEST sent via " + via + "; confirm SYNTHETIC_NETWORK_TEST on laptop");
             } catch (Exception e) {
                 callback.complete(false, "TEST failed: " + e.getClass().getSimpleName());
             }

@@ -139,7 +139,8 @@ class DJIAdapter extends TelemetrySource {
     resetTimeout() {
         clearTimeout(this.timeoutTimer);
         this.timeoutTimer = setTimeout(() => {
-            if (this.isConnected) { this.status = 'TELEMETRY_LOST'; this.emitStatus(this.status); }
+            // Before the first packet the listener is still waiting; "lost" would send operators chasing a drone fault.
+            if (this.isConnected && this.diagnostics.received > 0) { this.status = 'TELEMETRY_LOST'; this.emitStatus(this.status); }
         }, this.timeoutMs);
     }
     disconnect() {

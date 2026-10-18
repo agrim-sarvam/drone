@@ -40,6 +40,7 @@ public final class BridgeController {
 
     BridgeController(Context context) {
         this.context = context.getApplicationContext();
+        exporter.setRoute(new LocalNetworkRoute(this.context));
         exporter.setObserver((success, detail) -> {
             String state = success ? "SENDING (not acknowledged)" : detail;
             udp = state;
@@ -156,9 +157,7 @@ public final class BridgeController {
                 snapshot.velocityX = state.getVelocityX(); snapshot.velocityY = state.getVelocityY(); snapshot.velocityZ = state.getVelocityZ();
                 snapshot.flying = state.isFlying();
                 snapshot.flightMode = state.getFlightMode() == null ? null : state.getFlightMode().name();
-                TelemetryData sample = manager.updateFlightState(snapshot);
-                latest = sample;
-                exporter.sendTelemetry(sample);
+                publish(snapshot);
             });
             Diagnostics.record("Aircraft components attached");
         }
@@ -166,6 +165,12 @@ public final class BridgeController {
         // Retry component readiness, not SDK registration. Never start UDP automatically.
         if (flight == null || battery == null) main.postDelayed(retryAttach, 1000);
         notifyObservers();
+    }
+    /** Single path from an SDK-independent snapshot to the wire; instrumentation tests drive it without DJI hardware. */
+    void publish(FlightSnapshot snapshot) {
+        TelemetryData sample = manager.updateFlightState(snapshot);
+        latest = sample;
+        exporter.sendTelemetry(sample);
     }
     private void detach() {
         main.removeCallbacks(retryAttach);
@@ -177,14 +182,14 @@ public final class BridgeController {
         exporter.start(target);
         udp = "STARTED, waiting for aircraft samples";
         lastSendState = "";
-        Diagnostics.record("UDP started"); notifyObservers();
+        Diagnostics.record("UDP started via " + exporter.route()); notifyObservers();
     }
     public void stop() {
         exporter.stop(); udp = "STOPPED";
         Diagnostics.record("UDP stopped"); notifyObservers();
     }
     public String diagnosticReport() {
-        return Diagnostics.report("SDK: " + sdk + "\nAircraft: " + aircraft + "\nUDP: " + udp
+        return Diagnostics.report("SDK: " + sdk + "\nAircraft: " + aircraft + "\nUDP: " + udp + "\nRoute: " + exporter.route()
                 + "\nPackets sent: " + exporter.packetsSent.get() + "\nSend errors: " + exporter.sendErrors.get()
                 + "\nSample age ms: " + (latest == null ? "none" : Math.max(0, System.currentTimeMillis() - latest.timestamp)));
     }

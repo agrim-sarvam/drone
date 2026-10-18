@@ -1,7 +1,7 @@
 name: Bridge checks and APK
 on:
   push:
-    branches: [main, 'codex/**']
+    branches: [main, 'codex/**', 'claude/**']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -131,8 +131,14 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # The host-side check runs the desktop's DJI receiver; it needs no native modules.
+      - run: npm ci --ignore-scripts
       - run: chmod +x android-dji-bridge/gradlew
-      - name: Launch Android app and test actual button, UDP and rotation
+      - name: Launch Android app; test button, UDP, rotation and phone-to-desktop-receiver delivery
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 28
@@ -147,5 +153,7 @@ jobs:
           path: |
             android-ui.log
             android-emulator-crashes.log
+            host-receiver.log
+            host-receiver.json
             android-dji-bridge/app/build/reports/androidTests/
             android-dji-bridge/app/build/outputs/androidTest-results/

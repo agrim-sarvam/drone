@@ -180,6 +180,11 @@ ipcMain.handle('dji:disconnect', () => {
   return true;
 });
 ipcMain.handle('dji:diagnostics', () => dji.getDiagnostics());
+// The phone needs the laptop's LAN address; listing it avoids gateway/VPN/loopback mistakes during setup.
+ipcMain.handle('network:addresses', () => Object.entries(require('os').networkInterfaces())
+  .flatMap(([name, entries]) => (entries || [])
+    .filter(entry => entry.family === 'IPv4' && !entry.internal && !entry.address.startsWith('169.254.'))
+    .map(entry => ({ name, address: entry.address }))));
 
 // Recording IPCs
 ipcMain.handle('record:start', () => {

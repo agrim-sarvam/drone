@@ -2,6 +2,7 @@ package com.sentinel.cop.dji;
 
 import android.app.*;
 import android.content.Intent;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
 import com.sentinel.cop.dji.telemetry.Destination;
@@ -10,8 +11,16 @@ import com.sentinel.cop.dji.telemetry.Destination;
 public class BridgeService extends Service {
     private static final String CHANNEL = "bridge-telemetry";
     private boolean failed;
+    private WifiManager.WifiLock wifiLock;
     @Override public void onCreate() {
         super.onCreate();
+        // Wi-Fi power save batches outgoing frames once the screen is off, causing bursty, stale positions.
+        WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+        if (wifi != null) {
+            wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "sentinel:telemetry");
+            wifiLock.setReferenceCounted(false);
+            wifiLock.acquire();
+        }
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationManager manager = getSystemService(NotificationManager.class);
             manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Drone telemetry", NotificationManager.IMPORTANCE_LOW));
@@ -39,6 +48,7 @@ public class BridgeService extends Service {
         return START_NOT_STICKY;
     }
     @Override public void onDestroy() {
+        if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
         if (!failed) ((BridgeApplication) getApplication()).controller().stop();
         super.onDestroy();
     }

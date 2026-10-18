@@ -14,6 +14,16 @@ const ConnectionManager = ({ clearTelemetry, status }) => {
         : legacyConnected;
     const [diagnostics, setDiagnostics] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [addresses, setAddresses] = useState([]);
+    useEffect(() => {
+        if (connectionType !== 'DJI_JSON' || !window.electronAPI?.getLocalAddresses) return;
+        let active = true;
+        const refresh = () => window.electronAPI.getLocalAddresses().then(value => { if (active) setAddresses(value); }).catch(() => {});
+        refresh();
+        // Joining a hotspot after launch changes the address; keep the hint current.
+        const timer = setInterval(refresh, 5000);
+        return () => { active = false; clearInterval(timer); };
+    }, [connectionType]);
     useEffect(() => {
         if (!isConnected || connectionType !== 'DJI_JSON' || !window.electronAPI?.getDJIDiagnostics) return;
         let active = true;
@@ -90,6 +100,11 @@ const ConnectionManager = ({ clearTelemetry, status }) => {
         <div className="connection-manager">
             <h3>Hardware Connection</h3>
             <p>Listener IP is the laptop bind address. Use 0.0.0.0 here; enter the laptop's Wi-Fi IPv4 address on the phone.</p>
+            {connectionType === 'DJI_JSON' && (
+                <p className="local-addresses">Enter on phone: {addresses.length
+                    ? addresses.map(entry => `${entry.address} (${entry.name})`).join(', ')
+                    : 'no network connected — join the same Wi-Fi/hotspot as the phone'}</p>
+            )}
             
             <div className="connection-type-selector">
                 <label>

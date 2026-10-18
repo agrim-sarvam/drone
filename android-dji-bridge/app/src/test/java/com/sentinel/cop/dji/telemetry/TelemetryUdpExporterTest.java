@@ -49,6 +49,41 @@ public class TelemetryUdpExporterTest {
             assertTrue(exporter.effectiveDestination().endsWith(":"+second.getLocalPort()));
         } finally {exporter.stop();}
     }
+    @Test public void subnetMatchingSelectsOnlyTheLaptopsNetwork() {
+        byte[] wifi = {(byte)192,(byte)168,1,23};
+        assertTrue(Subnet.contains(wifi,24,new byte[]{(byte)192,(byte)168,1,50}));
+        assertFalse(Subnet.contains(wifi,24,new byte[]{(byte)192,(byte)168,2,50}));
+        assertTrue(Subnet.contains(new byte[]{10,(byte)128,0,1},9,new byte[]{10,(byte)200,3,4}));
+        assertFalse(Subnet.contains(new byte[]{10,(byte)128,0,1},9,new byte[]{10,1,3,4}));
+        assertTrue(Subnet.contains(wifi,32,wifi));
+        assertFalse(Subnet.contains(wifi,33,wifi));
+        assertFalse(Subnet.contains(new byte[16],64,new byte[16]));
+    }
+    @Test public void failedNetworkBindStillSendsOnDefaultRoute() throws Exception {
+        TelemetryUdpExporter exporter = new TelemetryUdpExporter();
+        exporter.setRoute((socket, destination) -> { throw new java.net.SocketException("ENONET"); });
+        TelemetryData sample = new TelemetryData(); sample.drone_id="TEST"; sample.timestamp=1;
+        try (DatagramSocket receiver=new DatagramSocket(0)) {
+            receiver.setSoTimeout(2000);
+            exporter.start(Destination.parse("127.0.0.1",String.valueOf(receiver.getLocalPort())));
+            assertTrue(exporter.route().startsWith("system default"));
+            exporter.sendTelemetry(sample);
+            receiver.receive(new DatagramPacket(new byte[4096],4096));
+        } finally { exporter.stop(); }
+    }
+    @Test public void tenHertzAircraftSamplesAreNotThinned() throws Exception {
+        TelemetryUdpExporter exporter = new TelemetryUdpExporter();
+        TelemetryData sample = new TelemetryData(); sample.drone_id="TEST"; sample.timestamp=1;
+        try (DatagramSocket receiver=new DatagramSocket(0)) {
+            receiver.setSoTimeout(2000);
+            exporter.start(Destination.parse("127.0.0.1",String.valueOf(receiver.getLocalPort())));
+            for (int i = 0; i < 10; i++) { exporter.sendTelemetry(sample); Thread.sleep(95); }
+            for (int i = 0; i < 10; i++) receiver.receive(new DatagramPacket(new byte[4096],4096));
+            // The counter is updated just after send() returns on the worker thread.
+            for (int i = 0; i < 100 && exporter.packetsSent.get() < 10; i++) Thread.sleep(10);
+            assertEquals(10, exporter.packetsSent.get());
+        } finally { exporter.stop(); }
+    }
     @Test public void encodingHasExplicitNoFixAndNoInventedMsl() throws Exception {
         TelemetryData sample=new TelemetryData(); sample.drone_id="DJI_AIRCRAFT"; sample.relative_altitude_m=40; sample.battery=80;
         JSONObject data=new JSONObject(new String(TelemetryUdpExporter.encode(sample,"test-session",1,false),StandardCharsets.UTF_8));
