@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import './OfflineMap.css';
 import PlatformMarker from './PlatformMarker';
 import FlightTrack from './FlightTrack';
+import { hasPosition } from '../../telemetryDisplay';
 
 import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -49,7 +50,7 @@ const OfflineMap = ({ telemetry, appMode, waypoints = [], setWaypoints, observat
 
     // Pan map to follow drone if telemetry updates, but only if not planning
     useEffect(() => {
-        if (mapRef.current && telemetry && telemetry.position && appMode !== 'PLANNING') {
+        if (mapRef.current && hasPosition(telemetry?.position) && appMode !== 'PLANNING') {
             const map = mapRef.current;
             map.panTo([telemetry.position.latitude, telemetry.position.longitude], { animate: true });
         }

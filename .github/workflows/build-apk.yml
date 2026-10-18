@@ -1,72 +1,142 @@
-name: Build Sentinel DJI Bridge APK
-
+name: Bridge checks and APK
 on:
   push:
-    branches: [ main ]
+    branches: [main, 'codex/**']
+  pull_request:
   workflow_dispatch:
-
+    inputs:
+      build_dji:
+        description: 'Build DJI-enabled APK using the repository DJI_API_KEY secret'
+        type: boolean
+        default: false
 permissions:
-  contents: write
-
+  contents: read
 jobs:
-  build:
+  desktop-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Desktop contracts, real loopback UDP, database and replay tests
+        shell: pwsh
+        run: |
+          npm test *> desktop-tests.log
+          $result = $LASTEXITCODE
+          Get-Content desktop-tests.log
+          exit $result
+      - run: npm ci --prefix client
+      - run: npm run build --prefix client
+      - name: Real Electron UI, UDP, recording and replay smoke
+        shell: pwsh
+        run: |
+          npm run test:desktop *> desktop-smoke.log
+          $result = $LASTEXITCODE
+          Get-Content desktop-smoke.log
+          exit $result
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-test-results
+          path: |
+            desktop-tests.log
+            desktop-smoke.log
+            test-results/
+  android:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
+          distribution: temurin
           java-version: '17'
-          distribution: 'temurin'
-
-      - name: Configure Android SDK and build APK
-        env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m"
+      - uses: android-actions/setup-android@v3
+      - name: Build and test network-only APK (cannot register with DJI)
+        working-directory: android-dji-bridge
         run: |
           set -o pipefail
-          mkdir -p "$ANDROID_HOME/licenses" || true
-          printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e\n84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-sdk-license" || true
-          echo "sdk.dir=$ANDROID_HOME" > android-dji-bridge/local.properties
-          chmod +x android-dji-bridge/gradlew
-          cd android-dji-bridge
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee ../build.log
-
-      - name: Report Build Error
-        if: failure()
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug -PnetworkOnly --no-daemon --console=plain 2>&1 | tee ../android-build.log
+      - name: Verify packaged manifest and checksum
         run: |
-          echo "### ❌ Build Failure Output" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -n 120 build.log >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git checkout -b build-logs || git checkout build-logs
-          cp build.log build_error.txt
-          git add build_error.txt
-          git commit -m "chore: save build log" || true
-          git push origin build-logs -f || true
-
-      - name: Locate APK
-        run: |
-          APK_FILE=$(find android-dji-bridge/app/build -name "*.apk" | head -n 1)
-          echo "Found APK: $APK_FILE"
-          echo "### 📦 Built APK: \`$APK_FILE\`" >> $GITHUB_STEP_SUMMARY
-          cp "$APK_FILE" ./Sentinel-DJI-Bridge.apk
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+          python scripts/verify_apk.py android-dji-bridge/app/build/outputs/apk/debug/app-debug.apk --network-only
+          sha256sum android-dji-bridge/app/build/outputs/apk/debug/app-debug.apk > network-apk.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: Sentinel-DJI-Bridge-APK
-          path: ./Sentinel-DJI-Bridge.apk
-
-      - name: Publish Public GitHub Release
-        uses: softprops/action-gh-release@v2
+          name: network-test-apk-and-reports
+          path: |
+            android-build.log
+            network-apk.sha256
+            android-dji-bridge/app/build/outputs/apk/debug/*.apk
+            android-dji-bridge/app/build/reports/
+            android-dji-bridge/app/build/test-results/
+  dji-apk:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_dji
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          tag_name: v1.0.0-apk
-          name: "Sentinel DJI Bridge APK (v1.0.0)"
-          body: "Direct download APK for Android phone connected to DJI Remote Controller (Air 2S / Mini / Mavic)."
-          files: ./Sentinel-DJI-Bridge.apk
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Build DJI-enabled APK
+        working-directory: android-dji-bridge
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DJI_API_KEY: ${{ secrets.DJI_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ -z "$DJI_API_KEY" ]; then echo 'Owner must set repository secret DJI_API_KEY for com.sentinel.cop.dji.'; exit 1; fi
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon --console=plain 2>&1 | tee ../dji-build.log
+      - name: Check real-key manifest without printing key
+        run: |
+          python scripts/verify_apk.py android-dji-bridge/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum android-dji-bridge/app/build/outputs/apk/debug/app-debug.apk > dji-apk.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dji-enabled-apk-and-reports
+          path: |
+            dji-build.log
+            dji-apk.sha256
+            android-dji-bridge/app/build/outputs/apk/debug/*.apk
+            android-dji-bridge/app/build/reports/
+            android-dji-bridge/app/build/test-results/
+  android-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - run: chmod +x android-dji-bridge/gradlew
+      - name: Launch Android app and test actual button, UDP and rotation
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 28
+          arch: x86
+          target: default
+          disable-animations: true
+          script: bash scripts/run-android-ui.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-ui-reports
+          path: |
+            android-ui.log
+            android-emulator-crashes.log
+            android-dji-bridge/app/build/reports/androidTests/
+            android-dji-bridge/app/build/outputs/androidTest-results/

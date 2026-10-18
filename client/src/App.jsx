@@ -6,6 +6,7 @@ import SensorFeed from './components/Video/SensorFeed';
 import ReplayControls from './components/Replay/ReplayControls';
 import MissionPanel from './components/Mission/MissionPanel';
 import ConnectionManager from './components/Telemetry/ConnectionManager';
+import { formatNumber, altitudeLabel } from './telemetryDisplay';
 
 function App() {
   const [appMode, setAppMode] = useState('LIVE'); // LIVE, REPLAY, PLANNING, OBSERVE
@@ -33,9 +34,11 @@ function App() {
   useEffect(() => {
     loadObservations();
     if (window.electronAPI) {
-      window.electronAPI.onTelemetry((data) => {
+      const stopTelemetry = window.electronAPI.onTelemetry((data) => {
         setTelemetryState(data);
       });
+      const stopStatus = window.electronAPI.onSimulatorStatus(setSimStatus);
+      return () => { stopTelemetry(); stopStatus(); };
     }
   }, []);
 
@@ -134,25 +137,29 @@ function App() {
         <aside className="panel platform-panel">
           <h2>Platform Panel</h2>
           <div className="panel-content">
-            <ConnectionManager clearTelemetry={() => setTelemetryState(null)} />
+            <ConnectionManager clearTelemetry={() => setTelemetryState(null)} status={simStatus} />
             
             <div className="platform-stats">
               <p>Listener: {
-                simStatus === 'UDP_LISTENER_ACTIVE' || simStatus === 'TELEMETRY_RECEIVED' || simStatus === 'TELEMETRY_LOST' ? 'ACTIVE' :
+                ['UDP_LISTENER_ACTIVE', 'TELEMETRY_RECEIVED', 'TEST_TELEMETRY_RECEIVED', 'WAITING_FOR_GPS', 'TELEMETRY_LOST'].includes(simStatus) ? 'ACTIVE' :
                 simStatus === 'DISCONNECTED' || simStatus === 'STOPPED' ? 'INACTIVE' : 
                 simStatus === 'ERROR' ? 'ERROR' : 'UNKNOWN'
               }</p>
               <p>Telemetry: {
                 simStatus === 'UDP_LISTENER_ACTIVE' ? 'WAITING FOR TELEMETRY' :
                 simStatus === 'TELEMETRY_RECEIVED' ? 'RECEIVED' :
+                simStatus === 'TEST_TELEMETRY_RECEIVED' ? 'SYNTHETIC NETWORK TEST (not aircraft data)' :
+                simStatus === 'WAITING_FOR_GPS' ? 'RECEIVING, WAITING FOR GPS FIX' :
                 simStatus === 'TELEMETRY_LOST' ? 'LOST' :
                 simStatus === 'RUNNING' ? 'SIMULATOR ACTIVE' :
                 (simStatus === 'MAVLINK_ACTIVE' || simStatus === 'MAVLINK_CONNECTED') ? 'WAITING FOR MAVLINK' : 
                 simStatus === 'ERROR' ? 'ERROR' : 'OFFLINE'
               }</p>
-              <p>Lat: {telemetryState ? telemetryState.position.latitude.toFixed(6) : '--'}</p>
-              <p>Lon: {telemetryState ? telemetryState.position.longitude.toFixed(6) : '--'}</p>
-              <p>Alt: {telemetryState ? telemetryState.position.altitudeMSL.toFixed(1) : '--'}</p>
+              <p>Lat: {formatNumber(telemetryState?.position?.latitude, 6)}</p>
+              <p>Lon: {formatNumber(telemetryState?.position?.longitude, 6)}</p>
+              <p>Altitude: {altitudeLabel(telemetryState?.position)}</p>
+              {simStatus === 'TELEMETRY_LOST' && <p role="alert">STALE DATA — last received position shown.</p>}
+              {telemetryState?.status?.synthetic && <p role="alert">SYNTHETIC TEST DATA</p>}
               <p>Grid (ESM): {telemetryState?.position?.gridReference || '--'}</p>
             </div>
           </div>
@@ -236,6 +243,8 @@ function App() {
           <span>Telemetry: {
             simStatus === 'RUNNING' ? 'Connected (SIM)' : 
             simStatus === 'TELEMETRY_LOST' ? 'Lost (Timeout)' :
+            simStatus === 'WAITING_FOR_GPS' ? 'Receiving (Awaiting GPS)' :
+            simStatus === 'TEST_TELEMETRY_RECEIVED' ? 'Synthetic network test' :
             (telemetryState ? 'Connected (Hardware)' : 
             (simStatus && (simStatus.startsWith('MAVLINK') || simStatus.startsWith('DJI') || simStatus === 'TELEMETRY_RESTORED') ? 'Connected (Awaiting GPS)' : 'Disconnected'))
           }</span>

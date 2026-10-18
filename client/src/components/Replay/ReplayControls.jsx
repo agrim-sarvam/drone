@@ -18,12 +18,12 @@ const ReplayControls = ({ onReplayStatusUpdate, onModeChange }) => {
         fetchFlights();
 
         if (window.electronAPI) {
-            window.electronAPI.onReplayStatus((status) => {
+            return window.electronAPI.onReplayStatus((status) => {
                 setPlaybackStatus(status);
                 onReplayStatusUpdate(status);
             });
         }
-    }, []);
+    }, [onReplayStatusUpdate]);
 
     const handleLoad = async () => {
         if (!selectedFlight) return;

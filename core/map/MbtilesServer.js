@@ -9,7 +9,7 @@ class MbtilesServer {
     }
 
     init() {
-        const mbtilesPath = path.join(__dirname, '../../data/map.mbtiles');
+        const mbtilesPath = path.join(process.env.SENTINEL_DATA_DIR || path.join(__dirname, '../../data'), 'map.mbtiles');
         if (fs.existsSync(mbtilesPath)) {
             try {
                 this.db = new Database(mbtilesPath, { readonly: true });

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Polyline } from 'react-leaflet';
+import { hasPosition } from '../../telemetryDisplay';
 
 const FlightTrack = ({ currentPosition }) => {
     const [track, setTrack] = useState([]);
 
     useEffect(() => {
-        if (currentPosition && currentPosition.latitude !== undefined && currentPosition.longitude !== undefined) {
+        if (hasPosition(currentPosition)) {
             setTrack((prevTrack) => {
                 const newPoint = [currentPosition.latitude, currentPosition.longitude];
                 

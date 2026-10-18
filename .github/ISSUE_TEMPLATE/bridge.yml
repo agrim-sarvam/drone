@@ -1,0 +1,33 @@
+name: Bridge connection problem
+description: Share the failing stage and reviewed diagnostic reports (never keys or flight data).
+title: '[Bridge] '
+body:
+  - type: textarea
+    id: versions
+    attributes:
+      label: Builds and devices
+      description: Commit/run URL, app version/mode, phone and Android version, controller, aircraft and firmware. No serial numbers needed.
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: First failing stage
+      options:
+        - APK install or startup
+        - SDK registration
+        - Aircraft USB connection
+        - Phone aircraft samples
+        - Static phone-to-laptop network test
+        - Real telemetry or GPS
+        - Disconnect or screen-lock recovery
+        - Recording or replay
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Reviewed diagnostic reports and reproduction
+      description: Attach/paste phone and receiver reports. Remove keys, IP addresses, coordinates, flight databases and raw captures. State expected and actual behaviour.
+    validations:
+      required: true

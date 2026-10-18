@@ -1,6 +1,7 @@
 import React from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
+import { hasPosition, formatNumber, altitudeLabel } from '../../telemetryDisplay';
 
 // Create a custom SVG drone icon
 const droneIcon = new L.DivIcon({
@@ -16,7 +17,7 @@ const droneIcon = new L.DivIcon({
 });
 
 const PlatformMarker = ({ position, platformId }) => {
-    if (!position || position.latitude === undefined || position.longitude === undefined) {
+    if (!hasPosition(position)) {
         return null; // Don't render if no position
     }
 
@@ -27,9 +28,9 @@ const PlatformMarker = ({ position, platformId }) => {
         >
             <Popup>
                 <strong>{platformId || 'Platform'}</strong><br/>
-                Lat: {position.latitude.toFixed(6)}<br/>
-                Lon: {position.longitude.toFixed(6)}<br/>
-                Alt: {position.altitudeMSL ? position.altitudeMSL.toFixed(1) + ' m' : 'N/A'}
+                Lat: {formatNumber(position.latitude, 6)}<br/>
+                Lon: {formatNumber(position.longitude, 6)}<br/>
+                Alt: {altitudeLabel(position)}
             </Popup>
         </Marker>
     );

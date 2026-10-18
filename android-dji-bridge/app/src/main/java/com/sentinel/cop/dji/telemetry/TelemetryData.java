@@ -5,6 +5,7 @@ public class TelemetryData {
     public long timestamp;
     public double lat;
     public double lon;
+    public boolean position_valid;
     public double altitude_m;
     public double relative_altitude_m;
     public double heading_deg;

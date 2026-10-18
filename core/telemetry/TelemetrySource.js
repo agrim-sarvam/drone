@@ -32,7 +32,11 @@ class TelemetrySource extends EventEmitter {
                 longitude: data.position?.longitude !== undefined ? data.position.longitude : null,
                 altitudeMSL: data.position?.altitudeMSL !== undefined ? data.position.altitudeMSL : null,
                 relativeAltitude: data.position?.relativeAltitude !== undefined ? data.position.relativeAltitude : null,
-                gridReference: data.position?.gridReference || (data.position?.latitude && data.position?.longitude ? mgrs.forward([data.position.longitude, data.position.latitude]) : null)
+                valid: data.position?.valid ?? (Number.isFinite(data.position?.latitude) && Number.isFinite(data.position?.longitude)),
+                altitudeReference: data.position?.altitudeReference ?? 'msl',
+                gridReference: data.position?.gridReference || (Number.isFinite(data.position?.latitude)
+                    && Number.isFinite(data.position?.longitude) && data.position.latitude >= -80 && data.position.latitude <= 84
+                    ? mgrs.forward([data.position.longitude, data.position.latitude]) : null)
             },
             attitude: {
                 roll: data.attitude?.roll !== undefined ? data.attitude.roll : null,
@@ -52,7 +56,9 @@ class TelemetrySource extends EventEmitter {
                 flightMode: data.status?.flightMode !== undefined ? data.status.flightMode : null,
                 battery: data.status?.battery !== undefined ? data.status.battery : null,
                 satellites: data.status?.satellites !== undefined ? data.status.satellites : null,
-                flying: data.status?.flying !== undefined ? data.status.flying : null
+                flying: data.status?.flying !== undefined ? data.status.flying : null,
+                positionValid: data.position?.valid ?? (Number.isFinite(data.position?.latitude) && Number.isFinite(data.position?.longitude)),
+                synthetic: data.status?.synthetic === true
             }
         };
 

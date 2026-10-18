@@ -1,5 +1,11 @@
 # Offline ISR Drone Feed & Geospatial COP
 
+**DJI bridge setup and troubleshooting:** see [CLIENT_SETUP_GUIDE.md](CLIENT_SETUP_GUIDE.md).
+The repaired bridge uses telemetry schema V2; update the Android and desktop applications together.
+GitHub Actions provides build/test reports and a network-only test APK. A DJI-enabled APK requires
+the owner's package-matched `DJI_API_KEY`; it is built only by explicit workflow dispatch.
+The bridge forwards telemetry, not live video. Real hardware compatibility remains a bench-test requirement.
+
 > Offline-first Common Operating Picture and geospatial visualization platform for drone/sensor data integration. 
 > **Version 1.0 Production Release**: Includes real-time hardware adapters for MAVLink (UDP/Serial) and DJI SDK JSON Telemetry.
 

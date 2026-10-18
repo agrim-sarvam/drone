@@ -1,17 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './ConnectionManager.css';
 
-const ConnectionManager = ({ clearTelemetry }) => {
-    const [connectionType, setConnectionType] = useState('MAVLINK_UDP'); // Fixed default
+const ConnectionManager = ({ clearTelemetry, status }) => {
+    const [connectionType, setConnectionType] = useState('DJI_JSON');
     const [udpHost, setUdpHost] = useState('0.0.0.0');
     const [udpPort, setUdpPort] = useState(14550);
     const [timeoutMs, setTimeoutMs] = useState(3000);
     const [serialPort, setSerialPort] = useState('/dev/ttyUSB0');
     const [baudRate, setBaudRate] = useState(57600);
-    const [isConnected, setIsConnected] = useState(false);
+    const [legacyConnected, setIsConnected] = useState(false);
+    const isConnected = connectionType === 'DJI_JSON'
+        ? ['UDP_LISTENER_ACTIVE', 'TELEMETRY_RECEIVED', 'TEST_TELEMETRY_RECEIVED', 'WAITING_FOR_GPS', 'TELEMETRY_LOST'].includes(status)
+        : legacyConnected;
+    const [diagnostics, setDiagnostics] = useState(null);
+    const [busy, setBusy] = useState(false);
+    useEffect(() => {
+        if (!isConnected || connectionType !== 'DJI_JSON' || !window.electronAPI?.getDJIDiagnostics) return;
+        let active = true;
+        const refresh = () => window.electronAPI.getDJIDiagnostics().then(value => { if (active) setDiagnostics(value); }).catch(() => {});
+        refresh();
+        const timer = setInterval(refresh, 1000);
+        return () => { active = false; clearInterval(timer); };
+    }, [isConnected, connectionType]);
 
     const handleConnectToggle = async () => {
         if (!window.electronAPI) return;
+        if (busy) return;
+        if (!isConnected && (connectionType === 'DJI_JSON' || connectionType === 'MAVLINK_UDP')
+            && (!Number.isInteger(udpPort) || udpPort < 1 || udpPort > 65535)) {
+            alert('Port must be from 1 to 65535.'); return;
+        }
+        setBusy(true);
+        try {
 
         if (isConnected) {
             if (connectionType === 'DJI_JSON') {
@@ -63,11 +83,13 @@ const ConnectionManager = ({ clearTelemetry }) => {
                 setIsConnected(true);
             }
         }
+        } finally { setBusy(false); }
     };
 
     return (
         <div className="connection-manager">
             <h3>Hardware Connection</h3>
+            <p>Listener IP is the laptop bind address. Use 0.0.0.0 here; enter the laptop's Wi-Fi IPv4 address on the phone.</p>
             
             <div className="connection-type-selector">
                 <label>
@@ -166,11 +188,23 @@ const ConnectionManager = ({ clearTelemetry }) => {
             )}
 
             <button 
+                disabled={busy}
                 className={`connect-btn ${isConnected ? 'disconnect' : ''}`}
                 onClick={handleConnectToggle}
             >
                 {isConnected ? 'Disconnect Drone' : 'Connect to Drone'}
             </button>
+            {diagnostics && connectionType === 'DJI_JSON' && (
+                <details>
+                    <summary>Receiver diagnostics (no coordinates)</summary>
+                    <pre>{JSON.stringify(diagnostics, null, 2)}</pre>
+                    <button onClick={() => {
+                        const url = URL.createObjectURL(new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'text/plain' }));
+                        const link = document.createElement('a'); link.href = url; link.download = 'sentinel-receiver-diagnostics.txt'; link.click();
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    }}>Save receiver report</button>
+                </details>
+            )}
         </div>
     );
 };

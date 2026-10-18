@@ -18,10 +18,12 @@ class TelemetryLogger {
         this.insertStmt = db.prepare(`
             INSERT INTO telemetry (
                 flight_id, timestamp, platform_id, latitude, longitude, altitude_m, relative_altitude_m, heading_deg, yaw_deg, pitch_deg, roll_deg, speed_mps,
-                velocity_x_mps, velocity_y_mps, velocity_z_mps, gps_satellites, battery_percent, flight_state, flying
+                velocity_x_mps, velocity_y_mps, velocity_z_mps, gps_satellites, battery_percent, flight_state, flying,
+                position_valid, synthetic, altitude_reference
             ) VALUES (
                 @flight_id, @timestamp, @platform_id, @latitude, @longitude, @altitude_m, @relative_altitude_m, @heading_deg, @yaw_deg, @pitch_deg, @roll_deg, @speed_mps,
-                @velocity_x_mps, @velocity_y_mps, @velocity_z_mps, @gps_satellites, @battery_percent, @flight_state, @flying
+                @velocity_x_mps, @velocity_y_mps, @velocity_z_mps, @gps_satellites, @battery_percent, @flight_state, @flying,
+                @position_valid, @synthetic, @altitude_reference
             )
         `);
     }
@@ -81,7 +83,10 @@ class TelemetryLogger {
                 gps_satellites: data.status.satellites !== undefined ? data.status.satellites : null,
                 battery_percent: data.status.battery !== undefined ? data.status.battery : null,
                 flight_state: data.status.flightMode !== undefined ? data.status.flightMode : null,
-                flying: data.status.flying !== undefined ? (data.status.flying ? 1 : 0) : null
+                flying: data.status.flying != null ? (data.status.flying ? 1 : 0) : null,
+                position_valid: data.position.valid == null ? null : Number(data.position.valid),
+                synthetic: Number(data.status.synthetic === true),
+                altitude_reference: data.position.altitudeReference ?? 'legacy-unspecified'
             });
         } catch (err) {
             console.error('Failed to log telemetry to DB:', err);

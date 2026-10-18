@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld(
     // DJI
     connectDJI: (config) => ipcRenderer.invoke('dji:connect', config),
     disconnectDJI: () => ipcRenderer.invoke('dji:disconnect'),
+    getDJIDiagnostics: () => ipcRenderer.invoke('dji:diagnostics'),
 
     // Mission
     saveMission: (name, waypoints) => ipcRenderer.invoke('mission:save', { name, waypoints }),
@@ -49,10 +50,20 @@ contextBridge.exposeInMainWorld(
 
     // Event listeners
     onTelemetry: (callback) => {
-        ipcRenderer.on('simulator:telemetry', (_event, data) => callback(data));
-        ipcRenderer.on('replay:telemetry', (_event, data) => callback(data));
+        const listener = (_event, data) => callback(data);
+        ipcRenderer.on('simulator:telemetry', listener);
+        ipcRenderer.on('replay:telemetry', listener);
+        return () => { ipcRenderer.removeListener('simulator:telemetry', listener); ipcRenderer.removeListener('replay:telemetry', listener); };
     },
-    onSimulatorStatus: (callback) => ipcRenderer.on('simulator:status', (_event, status) => callback(status)),
-    onReplayStatus: (callback) => ipcRenderer.on('replay:status', (_event, status) => callback(status)),
+    onSimulatorStatus: (callback) => {
+        const listener = (_event, status) => callback(status);
+        ipcRenderer.on('simulator:status', listener);
+        return () => ipcRenderer.removeListener('simulator:status', listener);
+    },
+    onReplayStatus: (callback) => {
+        const listener = (_event, status) => callback(status);
+        ipcRenderer.on('replay:status', listener);
+        return () => ipcRenderer.removeListener('replay:status', listener);
+    },
   }
 );

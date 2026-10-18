@@ -4,6 +4,17 @@
   "description": "````markdown # Offline ISR Drone Feed & Geospatial COP",
   "main": "electron/main.js",
   "build": {
+    "appId": "com.sentinel.cop.desktop",
+    "productName": "Sentinel COP",
+    "npmRebuild": false,
+    "files": [
+      "electron/**",
+      "adapters/**",
+      "core/**",
+      "database/**",
+      "client/dist/**",
+      "package.json"
+    ],
     "directories": {
       "output": "dist-electron"
     },
@@ -18,7 +29,8 @@
     "start": "cross-env NODE_ENV=production electron .",
     "dev": "cross-env NODE_ENV=development concurrently \"cd client && npm run dev\" \"wait-on tcp:5173 && electron .\"",
     "build": "cd client && npm run build && cd .. && electron-builder",
-    "test": "node tests/dji.test.js",
+    "test": "node tests/dji.test.js && node tests/coordinates/engine.test.js && node --test tests/bridge/*.test.cjs",
+    "test:desktop": "node scripts/electron-smoke.cjs",
     "simulate:dji": "node scripts/simulate_dji_stream.js"
   },
   "keywords": [],
@@ -30,6 +42,7 @@
     "cross-env": "^10.1.0",
     "electron": "^44.4.4",
     "electron-builder": "^26.15.3",
+    "playwright": "^1.64.1",
     "wait-on": "^9.1.0"
   },
   "dependencies": {

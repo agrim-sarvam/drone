@@ -10,17 +10,18 @@ const SimulatorControls = ({ onTelemetryUpdate, onStatusUpdate, setWaypoints }) 
 
     useEffect(() => {
         if (window.electronAPI) {
-            window.electronAPI.onTelemetry((data) => {
+            const stopTelemetry = window.electronAPI.onTelemetry((data) => {
                 if (onTelemetryUpdate) onTelemetryUpdate(data);
             });
 
-            window.electronAPI.onSimulatorStatus((newStatus) => {
+            const stopStatus = window.electronAPI.onSimulatorStatus((newStatus) => {
                 setStatus(newStatus);
                 if (onStatusUpdate) onStatusUpdate(newStatus);
             });
             
             // Load saved missions for Execution Mode
             window.electronAPI.getMissions().then(setMissions).catch(console.error);
+            return () => { stopTelemetry(); stopStatus(); };
         }
     }, [onTelemetryUpdate, onStatusUpdate]);
 

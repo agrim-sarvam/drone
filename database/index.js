@@ -3,13 +3,13 @@ const path = require('path');
 const fs = require('fs');
 
 // Ensure data directory exists
-const dataDir = path.join(__dirname, '../data');
+const dataDir = process.env.SENTINEL_DATA_DIR || path.join(__dirname, '../data');
 if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
 }
 
 const dbPath = path.join(dataDir, 'cop_database.sqlite');
-const db = new Database(dbPath, { verbose: console.log });
+const db = new Database(dbPath);
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
@@ -128,5 +128,28 @@ if (columns.includes('flightId') && !columns.includes('flight_id')) {
     `);
     console.log("Migration complete.");
 }
+
+// V2 includes useful battery/status samples before GPS fix and does not invent MSL altitude.
+// Rebuild once to remove the old NOT NULL constraints, preserving historical rows.
+const canonical = db.pragma('table_info(telemetry)');
+if (canonical.some(column => ['latitude', 'longitude', 'altitude_m'].includes(column.name) && column.notnull)) {
+    const names = canonical.map(column => column.name);
+    db.transaction(() => {
+        db.exec(`CREATE TABLE telemetry_nullable (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, flight_id TEXT, timestamp INTEGER NOT NULL,
+            platform_id TEXT NOT NULL, latitude REAL, longitude REAL, altitude_m REAL,
+            relative_altitude_m REAL, heading_deg REAL, yaw_deg REAL, pitch_deg REAL, roll_deg REAL,
+            speed_mps REAL, velocity_x_mps REAL, velocity_y_mps REAL, velocity_z_mps REAL,
+            gps_satellites INTEGER, battery_percent INTEGER, flight_state TEXT, flying INTEGER
+        )`);
+        const fields = names.map(name => `"${name}"`).join(', ');
+        db.exec(`INSERT INTO telemetry_nullable (${fields}) SELECT ${fields} FROM telemetry;
+            DROP TABLE telemetry; ALTER TABLE telemetry_nullable RENAME TO telemetry;`);
+    })();
+}
+const telemetryColumns = db.pragma('table_info(telemetry)').map(column => column.name);
+if (!telemetryColumns.includes('position_valid')) db.exec('ALTER TABLE telemetry ADD COLUMN position_valid INTEGER');
+if (!telemetryColumns.includes('synthetic')) db.exec('ALTER TABLE telemetry ADD COLUMN synthetic INTEGER NOT NULL DEFAULT 0');
+if (!telemetryColumns.includes('altitude_reference')) db.exec("ALTER TABLE telemetry ADD COLUMN altitude_reference TEXT NOT NULL DEFAULT 'legacy-unspecified'");
 
 module.exports = db;

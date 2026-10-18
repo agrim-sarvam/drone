@@ -1,0 +1,31 @@
+name: Windows desktop package
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/**']
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm ci --prefix client
+      - run: npm run build --prefix client
+      - name: Build portable Windows directory (unsigned)
+        run: npx electron-builder --win --dir
+      - name: Test the packaged executable
+        shell: pwsh
+        env:
+          SENTINEL_DESKTOP_EXECUTABLE: dist-electron/win-unpacked/Sentinel COP.exe
+        run: npm run test:desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-desktop-unsigned
+          path: dist-electron/win-unpacked/

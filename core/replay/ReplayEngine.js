@@ -97,6 +97,8 @@ class ReplayEngine extends EventEmitter {
                 longitude: raw.longitude,
                 altitudeMSL: raw.altitude_m,
                 relativeAltitude: raw.relative_altitude_m !== null ? raw.relative_altitude_m : undefined,
+                valid: raw.position_valid == null ? Number.isFinite(raw.latitude) && Number.isFinite(raw.longitude) : raw.position_valid === 1,
+                altitudeReference: raw.altitude_reference ?? 'legacy-unspecified',
                 gridReference: raw.gridReference || null
             },
             attitude: {
@@ -115,7 +117,9 @@ class ReplayEngine extends EventEmitter {
                 satellites: raw.gps_satellites !== null ? raw.gps_satellites : undefined,
                 battery: raw.battery_percent !== null ? raw.battery_percent : undefined,
                 flightMode: raw.flight_state !== null ? raw.flight_state : undefined,
-                flying: raw.flying !== null ? (raw.flying === 1) : undefined
+                flying: raw.flying !== null ? (raw.flying === 1) : undefined,
+                positionValid: raw.position_valid == null ? Number.isFinite(raw.latitude) && Number.isFinite(raw.longitude) : raw.position_valid === 1,
+                synthetic: raw.synthetic === 1
             }
         };
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import './SensorFeed.css';
+import { formatNumber, altitudeLabel } from '../../telemetryDisplay';
 
 const SensorFeed = ({ telemetry }) => {
     const canvasRef = useRef(null);
@@ -48,12 +49,12 @@ const SensorFeed = ({ telemetry }) => {
             ctx.font = '12px monospace';
             
             if (telemetry && telemetry.position) {
-                ctx.fillText(`LAT: ${telemetry.position.latitude.toFixed(6)}`, 10, 20);
-                ctx.fillText(`LON: ${telemetry.position.longitude.toFixed(6)}`, 10, 40);
-                ctx.fillText(`ALT: ${telemetry.position.altitudeMSL.toFixed(1)}m`, 10, 60);
+                ctx.fillText(`LAT: ${formatNumber(telemetry.position.latitude, 6)}`, 10, 20);
+                ctx.fillText(`LON: ${formatNumber(telemetry.position.longitude, 6)}`, 10, 40);
+                ctx.fillText(`ALT: ${altitudeLabel(telemetry.position)}`, 10, 60);
                 
-                ctx.fillText(`YAW: ${telemetry.attitude.yaw.toFixed(1)}°`, width - 90, 20);
-                ctx.fillText(`SPD: ${telemetry.velocity.groundSpeed.toFixed(1)}`, width - 90, 40);
+                ctx.fillText(`YAW: ${formatNumber(telemetry.attitude?.yaw)}°`, width - 90, 20);
+                ctx.fillText(`SPD: ${formatNumber(telemetry.velocity?.groundSpeed)}`, width - 90, 40);
             } else {
                 ctx.fillText("NO TELEMETRY", 10, 20);
             }
@@ -77,7 +78,7 @@ const SensorFeed = ({ telemetry }) => {
     return (
         <div className="sensor-feed-container" style={{position: 'relative'}}>
             <video 
-                src="/test-video.mp4" 
+                src="./test-video.mp4"
                 autoPlay 
                 loop 
                 muted 
@@ -91,7 +92,7 @@ const SensorFeed = ({ telemetry }) => {
                 className="sensor-canvas"
             />
             <div className="sensor-overlay-text">
-                <span className="live-badge">LIVE</span>
+                <span className="live-badge">DEMO VIDEO — not a DJI live feed</span>
             </div>
         </div>
     );

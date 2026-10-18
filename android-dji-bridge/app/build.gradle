@@ -4,7 +4,11 @@ Properties properties = new Properties()
 if (project.rootProject.file('local.properties').exists()) {
     properties.load(project.rootProject.file('local.properties').newDataInputStream())
 }
-def djiApiKey = properties.getProperty('dji.api.key', 'MISSING_API_KEY')
+def djiApiKey = System.getenv('DJI_API_KEY') ?: properties.getProperty('dji.api.key', '')
+def networkOnly = project.hasProperty('networkOnly')
+if (!networkOnly && (!djiApiKey || djiApiKey == 'MISSING_API_KEY')) {
+    throw new GradleException('Set DJI_API_KEY or dji.api.key in local.properties. For network tests only, use -PnetworkOnly (DJI registration disabled).')
+}
 
 android {
     compileSdkVersion 33
@@ -12,9 +16,17 @@ android {
         applicationId "com.sentinel.cop.dji"
         minSdkVersion 23
         targetSdkVersion 33
-        versionCode 1
-        versionName "1.0"
-        manifestPlaceholders = [djiApiKey: djiApiKey]
+        versionCode 2
+        versionName "1.1.0"
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        manifestPlaceholders = [djiApiKey: networkOnly ? 'NETWORK_TEST_ONLY' : djiApiKey,
+                                bridgeLabel: networkOnly ? 'Sentinel Network Test' : 'Sentinel DJI Bridge']
+        buildConfigField 'boolean', 'NETWORK_ONLY', networkOnly.toString()
+        buildConfigField 'String', 'SOURCE_REVISION', '"' + (System.getenv('GITHUB_SHA') ?: 'local') + '"'
+        if (networkOnly) {
+            applicationIdSuffix '.networktest'
+            versionNameSuffix '-network-test'
+        }
     }
     buildTypes {
         release {
@@ -39,9 +51,10 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
     lintOptions {
-        abortOnError false
-        checkReleaseBuilds false
+        abortOnError true
     }
+    testOptions { unitTests.returnDefaultValues = true }
+    sourceSets { test.resources.srcDirs += '../../tests/fixtures' }
 }
 
 dependencies {
@@ -54,4 +67,9 @@ dependencies {
         exclude module: 'fly-safe-database'
     }
     compileOnly 'com.dji:dji-sdk-provided:4.16.2'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }

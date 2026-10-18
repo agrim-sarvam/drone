@@ -8,3 +8,8 @@ media/
 .DS_Store
 dist-electron/
 android-dji-bridge/.gradle/
+android-dji-bridge/local.properties
+android-dji-bridge/**/build/
+*.jks
+*.keystore
+test-results/

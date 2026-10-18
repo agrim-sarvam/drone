@@ -1,5 +1,9 @@
 const { app, BrowserWindow, ipcMain, protocol, net } = require('electron');
 const path = require('path');
+if (process.env.SENTINEL_USER_DATA_DIR) app.setPath('userData', process.env.SENTINEL_USER_DATA_DIR);
+// Installed applications cannot write their SQLite database inside app.asar.
+process.env.SENTINEL_DATA_DIR = path.join(app.getPath('userData'), 'data');
+if (!app.isPackaged) require('../core/storage/migrateLegacyData')(path.join(__dirname, '../data'), process.env.SENTINEL_DATA_DIR);
 const mbtilesServer = require('../core/map/MbtilesServer');
 
 // Register custom protocol for maps
@@ -175,6 +179,7 @@ ipcMain.handle('dji:disconnect', () => {
   attachTelemetrySource(simulator);
   return true;
 });
+ipcMain.handle('dji:diagnostics', () => dji.getDiagnostics());
 
 // Recording IPCs
 ipcMain.handle('record:start', () => {
