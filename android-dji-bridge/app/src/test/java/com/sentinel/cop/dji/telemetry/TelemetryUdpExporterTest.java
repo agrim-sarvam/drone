@@ -85,7 +85,7 @@ public class TelemetryUdpExporterTest {
         } finally { exporter.stop(); }
     }
     private static TelemetryData withFix() {
-        TelemetryData sample = withFix();
+        TelemetryData sample = new TelemetryData(); sample.drone_id="TEST"; sample.timestamp=1;
         sample.position_valid=true; sample.lat=28.6; sample.lon=77.2; sample.gps_satellites=12;
         return sample;
     }
